@@ -120,11 +120,18 @@ resource directories: `settings put system system_locales zh-CN` plus a reboot
 puts `[zh_CN]` into the activity's `mCurrentConfig`, and the same path back to
 `en-US` renders English again.
 
+On real hardware — a Xiaomi 25113PN0EC running Android 16 at 1220x2656 and 520 dpi,
+about 375x817 dp — the same simulated feed renders correctly in both languages, and
+`cmd locale set-app-locales com.onebody.widscan58 --locales en` flips the app to
+English while the phone itself stays Chinese, which is the Android 13+ per-app
+picker taking `res/xml/locale_config.xml` at its word. That pass found two things
+the emulator could not: Android 15+ lays content under the status and gesture bars,
+so the content view now pads itself by the system-bar insets, and vendor
+`DeviceDefault` themes disagree about button case, so the two buttons pin theirs.
+
 Not yet exercised is the real USB path — enumeration, the permission dialog, the
 `PROTOCOL MONITOR` handshake and the C5 DTR/RTS erratum — because that needs the
-board on a phone. The Android 13+ per-app language picker is likewise unproven:
-the emulator runs Android 11, and the Android 16 phone available here refuses
-`adb install` until USB installation is switched on by hand.
+board on a phone.
 
 ## License
 

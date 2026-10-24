@@ -27,6 +27,7 @@ class MainActivity : Activity() {
             typeface = android.graphics.Typeface.MONOSPACE
         }
         setContentView(ScrollView(this).apply { addView(text) })
+        padContentForSystemBars()
     }
 
     override fun onResume() {

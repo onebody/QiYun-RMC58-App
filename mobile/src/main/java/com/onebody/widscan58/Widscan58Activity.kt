@@ -79,6 +79,7 @@ class Widscan58Activity : Activity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_instrument)
+        padContentForSystemBars()
         theme = Style(this)
         statusLine = findViewById(R.id.status)
         bandRow = findViewById(R.id.bands)

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Handheld layout: status, one-tap bands, panorama + waterfall, channel tiles,
-     run/gain/holds bar. GPL-3.0-or-later. -->
+     run/gain/holds bar. The buttons pin their own capitalisation because the
+     vendor DeviceDefault themes disagree: AOSP renders "Stop", MIUI "STOP".
+     GPL-3.0-or-later. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -122,7 +124,8 @@
             android:id="@+id/scan"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:minWidth="96dp" />
+            android:minWidth="96dp"
+            android:textAllCaps="false" />
 
         <TextView
             android:id="@+id/gainValue"
@@ -144,6 +147,7 @@
             android:id="@+id/holds"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/holds" />
+            android:text="@string/holds"
+            android:textAllCaps="false" />
     </LinearLayout>
 </LinearLayout>
