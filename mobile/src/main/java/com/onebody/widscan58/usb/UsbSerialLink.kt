@@ -51,10 +51,6 @@ class UsbSerialLink private constructor(
 
     private fun readLoop() {
         val endpoint = layout.inEndpoint
-        if (endpoint == null) {
-            finish("no bulk IN endpoint")
-            return
-        }
         // Android's USB host stack caps a bulk transfer at 16 KiB.
         val buffer = ByteArray(MAX_TRANSFER)
         var idle = 0
@@ -80,10 +76,8 @@ class UsbSerialLink private constructor(
     private fun stillPresent() = manager.deviceList[device.deviceName] != null
 
     /** Commands are a few dozen bytes; the CDC write path takes them in one shot. */
-    fun write(data: ByteArray): Boolean {
-        val endpoint = layout.outEndpoint ?: return false
-        return connection.bulkTransfer(endpoint, data, data.size, WRITE_TIMEOUT_MS) >= 0
-    }
+    fun write(data: ByteArray): Boolean =
+        connection.bulkTransfer(layout.outEndpoint, data, data.size, WRITE_TIMEOUT_MS) >= 0
 
     fun close() {
         active = false
