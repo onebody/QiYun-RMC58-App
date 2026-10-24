@@ -129,9 +129,24 @@ the emulator could not: Android 15+ lays content under the status and gesture ba
 so the content view now pads itself by the system-bar insets, and vendor
 `DeviceDefault` themes disagree about button case, so the two buttons pin theirs.
 
-Not yet exercised is the real USB path — enumeration, the permission dialog, the
-`PROTOCOL MONITOR` handshake and the C5 DTR/RTS erratum — because that needs the
-board on a phone.
+The wire format and the command set were then checked against the board itself, over
+its CDC-ACM port on the Mac, rather than only against the simulator. A 128 KiB capture
+decoded to 150 SPECTRUM, 902 METRICS and 22 TELEMETRY frames with zero CRC errors, at
+the ~370 KB/s the board sustains in monitor mode, and every line the connect handshake
+sends was answered acceptingly: `PROTOCOL MONITOR`, `CHANNELS R1=5658 … R8=5917`,
+`MODE GROUP`, `GAIN MANUAL 45`, `SPEC 4 256 40000000 MAX`, `PROFILE?`, `STATUS?`,
+`SPURS?`, `SCAN START` and `INFO` (`INFO widscan58|esp32c5|1|78d1c81|…`). Three things
+came out of that which the firmware source alone does not make obvious: the board's
+USB-Serial-JTAG exposes a vendor class `0xFF` interface with a bulk pair of its own
+right beside the CDC one, `CHANNELS?`/`MODE?`/`SPEC?` are not commands at all (the
+device answers `ERR command`), and a scan that is stopped keeps sending `TELEMETRY`
+frames at about 4 Hz, which is what lets the watchdog treat a truly silent line as a
+dead link instead of an idle one.
+
+Not yet exercised is the last part of the real USB path — enumeration on a phone, the
+permission dialog, and the C5 DTR/RTS erratum — because that needs the board on a
+phone. `MainActivity` is the diagnostic for exactly that: it prints each attached
+device's VID/PID, permission state and per-interface endpoint table.
 
 ## License
 
