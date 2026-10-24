@@ -53,6 +53,7 @@ class Widscan58Activity : Activity() {
     private lateinit var theme: Style
     private lateinit var panorama: PanoramaView
     private lateinit var tiles: List<ChannelTileView>
+    private lateinit var tileGrid: View
     private lateinit var bandRow: LinearLayout
     private lateinit var bandChips: List<Pair<String, Button>>
     private lateinit var statusLine: TextView
@@ -64,6 +65,7 @@ class Widscan58Activity : Activity() {
     private lateinit var avgChip: Button
 
     private var link: UsbSerialLink? = null
+    private var sim: SimFeed? = null
     private var runner: CommandRunner? = null
     private var parser: StreamParser? = null
     private var selected = -1
@@ -71,6 +73,7 @@ class Widscan58Activity : Activity() {
     private var lastFrameMs = 0L
     private var drawnVersion = -1L
     private var note = ""
+    private var showSim = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +83,7 @@ class Widscan58Activity : Activity() {
         statusLine = findViewById(R.id.status)
         bandRow = findViewById(R.id.bands)
         panorama = findViewById(R.id.panorama)
+        tileGrid = findViewById(R.id.tiles)
         scanButton = findViewById(R.id.scan)
         holdsButton = findViewById(R.id.holds)
         gainBar = findViewById(R.id.gain)
@@ -133,12 +137,18 @@ class Widscan58Activity : Activity() {
         })
 
         statusLine.text = getString(R.string.plug_in)
+        // `adb shell am start -n com.onebody.widscan58/.Widscan58Activity --ez sim true`
+        showSim = intent.getBooleanExtra("sim", false)
+        if (showSim) {
+            sim = SimFeed(store, main, ::refresh).also { it.start() }
+        }
     }
 
     override fun onResume() {
         super.onResume()
         main.post(drawLoop)
         main.postDelayed(watchdog, WATCHDOG_PERIOD_MS)
+        if (showSim) sim?.start()
         if (link == null) findBoard(usbManager())?.let(::requestAndOpen)
     }
 
@@ -153,6 +163,7 @@ class Widscan58Activity : Activity() {
         super.onPause()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
+        sim?.stop()
         closeLink("paused")
     }
 
@@ -177,7 +188,9 @@ class Widscan58Activity : Activity() {
         panorama.invalidate()
 
         val now = store.now()
-        tiles.forEachIndexed { id, view -> view.bind(channelTile(store, id, selected), now) }
+        val planned = store.profile != null
+        tileGrid.visibility = if (planned) View.VISIBLE else View.GONE
+        if (planned) tiles.forEachIndexed { id, view -> view.bind(channelTile(store, id, selected), now) }
 
         val deviceGain = store.status?.gain
         if (!draggingGain) {
@@ -189,25 +202,30 @@ class Widscan58Activity : Activity() {
         val band = currentBand()
         bandChips.forEach { (letter, chip) -> tint(chip, letter == band) }
 
-        val running = scanRunning()
-        scanButton.setText(if (running) R.string.scan_stop else R.string.scan_start)
-        scanButton.isEnabled = link != null
-        gainBar.isEnabled = link != null
+        val live = link != null || sim != null
+        val running = sim?.running ?: scanRunning()
+        scanButton.setText(if (live && running) R.string.scan_stop else R.string.scan_start)
+        scanButton.isEnabled = live
+        gainBar.isEnabled = live
         statusLine.text = status()
     }
 
     private fun scanRunning(): Boolean = store.telemetry?.running ?: (store.status?.running ?: 1) != 0
 
     private fun status(): String {
-        val l = link ?: return note.ifEmpty { getString(R.string.plug_in) }
         val parts = mutableListOf<String>()
         if (note.isNotEmpty()) parts.add(note)
+        val l = link
+        when {
+            l != null -> parts.add(l.description)
+            sim != null -> parts.add("simulated device")
+            else -> return note.ifEmpty { getString(R.string.plug_in) }
+        }
         parts.add(store.profile?.name ?: "connecting…")
         store.telemetry?.let { parts.add(String.format("%.0f rot/s", it.rotationHz)) }
         store.status?.let { parts.add("${it.plan.size} hops") }
         parts.add("gain ${store.status?.gain ?: prefs.gain}")
         store.telemetry?.let { parts.add(String.format("link %.0f%%", it.linkFill * 100)) }
-        parts.add(l.description)
         return parts.joinToString(" · ")
     }
 
@@ -311,6 +329,10 @@ class Widscan58Activity : Activity() {
     }
 
     private fun command(line: String, reply: (CommandResult) -> Unit = {}) {
+        sim?.let {
+            it.onCommand(line)
+            return
+        }
         val r = runner ?: run {
             note = "not connected: $line"
             return
@@ -333,14 +355,18 @@ class Widscan58Activity : Activity() {
         }
     }
 
+    /** A band or trace toggle: single letters get a fixed square so the row reads as a keypad. */
     private fun chip(label: String) = Button(this).apply {
         text = label
         isAllCaps = false
-        textSize = 12f
+        textSize = 11f
         minWidth = 0
-        setPadding(theme.dp(9f).roundToInt(), 0, theme.dp(9f).roundToInt(), 0)
+        minimumWidth = 0
+        minHeight = 0
+        setPadding(theme.dp(6f).roundToInt(), 0, theme.dp(6f).roundToInt(), 0)
         layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+            if (label.length == 1) theme.dp(40f).roundToInt() else LinearLayout.LayoutParams.WRAP_CONTENT,
+            theme.dp(34f).roundToInt(),
         ).apply { marginEnd = theme.dp(2f).roundToInt() }
     }
 

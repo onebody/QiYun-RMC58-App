@@ -38,12 +38,31 @@ the board in can also open it by itself.
 | status line | profile, rotations/s, hops, gain, link fill, link name |
 | band chips | one tap puts a whole band (R/A/B/E/F/L) on the device; `Max`/`Avg` toggle the hold traces |
 | panorama | every LO segment stitched on a nearest-LO basis: live trace, max hold, average, per-bin noise floor, RSSI/search windows per channel, plan LO markers, board spurs |
-| waterfall | one row per completed scan rotation (~60/s), scaled against the smoothed noise floor |
+| waterfall | one row per completed scan rotation, newest at the top, scaled against the smoothed noise floor; 2 dp per row, so about 45 rotations of history on a phone |
 | channel tiles | level (EMA when reported), bar over floor−10…floor+40 dB, SNR, floor, badges, 10 s sparkline |
 | bottom bar | Start/Stop, manual gain 0…63, Reset holds |
 
 Tap the chart or a tile to select a channel. Long-press the chart fits the dB
-range to what is on screen (it is remembered).
+range to what is on screen (it is remembered). Until a plan arrives the tiles are
+hidden and the chart reads *Waiting for spectrum frames…* rather than showing a
+false empty sweep.
+
+## Without the board
+
+`SimFeed` is a device simulator behind one intent extra, so the instrument can be
+laid out and demoed with no hardware (the web UI has the same thing in
+`repo/web/src/mock`):
+
+```sh
+adb shell am start -n com.onebody.widscan58/.Widscan58Activity --ez sim true
+```
+
+It emits the same SPECTRUM / METRICS / TELEMETRY payloads the firmware does for a
+band of VTXs plus the board spurs, answers the band, gain and Start/Stop
+controls, and never touches the USB stack. Nothing else starts it.
+
+The screen is portrait-only for now: there is no landscape layout, and rotating
+would crush the panorama into a strip.
 
 ## How it talks to the board
 
@@ -75,9 +94,17 @@ when the board shows up but not as a CDC port.
 
 ## Verification
 
-`:core:test` is green on the JVM. The UI compiles into an APK but has not been
-driven on a real phone yet — the panel geometry, touch targets and the USB
-handshake need a device (and the board) to confirm.
+`:core:test` — 49 JVM tests over the frame codec, stream resync, command runner,
+store, panorama compositing, waterfall rows and channel tiles.
+
+The UI has been driven on an `arm64-v8a` emulator (Android 11, 1080x1920) against
+the simulated feed at 411x731 dp and, with `adb shell wm density 480`, at 360x640
+dp: empty state, band switching, dB fit, hold toggles, gain and Start/Stop all
+behave, and the waterfall fills one row per rotation.
+
+Not yet exercised is the real USB path — enumeration, the permission dialog, the
+`PROTOCOL MONITOR` handshake and the C5 DTR/RTS erratum — because that needs the
+board on a phone.
 
 ## License
 

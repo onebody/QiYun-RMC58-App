@@ -32,10 +32,10 @@ class ChannelTileView @JvmOverloads constructor(context: Context, attrs: Attribu
         strokeJoin = Paint.Join.ROUND
     }
     private val title = theme.text(11f, theme.ink2, bold = true)
-    private val freq = theme.text(10f, theme.muted)
-    private val big = theme.text(20f, theme.ink)
-    private val unit = theme.text(9f, theme.muted)
-    private val kv = theme.text(10f, theme.muted)
+    private val freq = theme.text(9f, theme.muted)
+    private val big = theme.text(18f, theme.ink)
+    private val unit = theme.text(8f, theme.muted)
+    private val kv = theme.text(9f, theme.muted)
     private val badgeText = theme.text(8f, theme.good, bold = true)
 
     private var tile: ChannelTile? = null
@@ -109,16 +109,17 @@ class ChannelTileView @JvmOverloads constructor(context: Context, attrs: Attribu
             )
         }
 
+        // Four columns leave ~72 dp of text width, so SNR and floor get their own line
+        // instead of colliding on a narrow phone.
         y += theme.dp(16f)
         kv.color = theme.muted
         kv.alpha = alpha
         canvas.drawText("SNR ${fmtDb(t.snr)}", pad, y, kv)
-        kv.textAlign = Paint.Align.RIGHT
-        canvas.drawText("floor ${fmtDb(t.floor)}", right, y, kv)
-        kv.textAlign = Paint.Align.LEFT
+        y += theme.dp(TEXT_LINE_DP)
+        canvas.drawText("floor ${fmtDb(t.floor)}", pad, y, kv)
 
         if (t.badges.isNotEmpty()) {
-            y += theme.dp(13f)
+            y += theme.dp(TEXT_LINE_DP)
             var bx = pad
             val top = y - theme.sp(9f)
             val bottom = y + theme.dp(2f)
@@ -182,5 +183,6 @@ class ChannelTileView @JvmOverloads constructor(context: Context, attrs: Attribu
     companion object {
         private const val SPARK_WINDOW_S = 10.0
         private const val SPARK_H_DP = 18f
+        private const val TEXT_LINE_DP = 13f
     }
 }

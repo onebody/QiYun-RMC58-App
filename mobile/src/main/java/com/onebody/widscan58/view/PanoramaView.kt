@@ -68,6 +68,7 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
     private var y1 = -20.0
     private var spectrumTop = 0f
     private var waterfallBottom = 0f
+    private var rowPx = 1f
 
     override fun onDraw(canvas: Canvas) {
         val store = store
@@ -76,14 +77,17 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fill)
         if (store == null || profile == null || store.segments.isEmpty()) {
             lastComp = null
-            canvas.drawText("Waiting for spectrum frames…", theme.dp(10f), theme.dp(18f), axisLabel)
+            val hint = "Waiting for spectrum frames…"
+            axisLabel.textAlign = Paint.Align.CENTER
+            canvas.drawText(hint, width / 2f, height / 2f, axisLabel)
+            axisLabel.textAlign = Paint.Align.LEFT
             return
         }
 
         val left = theme.dp(30f)
         val right = width - theme.dp(8f)
-        val wfHeight = (height * 0.36f).coerceIn(theme.dp(60f), theme.dp(150f))
-        spectrumTop = theme.dp(13f)
+        val wfHeight = (height * 0.34f).coerceIn(theme.dp(56f), theme.dp(140f))
+        spectrumTop = theme.dp(16f)
         val spectrumBottom = height - wfHeight - theme.dp(15f)
         val wfTop = height - wfHeight
         waterfallBottom = height - theme.dp(13f)
@@ -119,7 +123,7 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
 
         unit.textAlign = Paint.Align.LEFT
         unit.color = theme.muted
-        canvas.drawText("dBFS/bin", theme.dp(2f), spectrumTop - theme.dp(3f), unit)
+        canvas.drawText("dBFS/bin", theme.dp(2f), spectrumTop - theme.dp(5f), unit)
 
         drawWaterfall(canvas, store, comp, left, right, wfTop, waterfallBottom)
     }
@@ -170,7 +174,8 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
     ) {
         axisLabel.color = theme.muted
         line.color = theme.grid
-        val dbStep = niceStep(y1 - y0, 5)
+        // Label density follows the pixels available, so a short view never stacks its gridlines.
+        val dbStep = niceStep(y1 - y0, ((bottom - top) / theme.dp(24f)).roundToInt().coerceIn(2, 6))
         var v = ceil(y0 / dbStep) * dbStep
         axisLabel.textAlign = Paint.Align.RIGHT
         while (v <= y1 + 1e-9) {
@@ -179,13 +184,14 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
             canvas.drawText(v.roundToInt().toString(), left - theme.dp(4f), y + theme.dp(3f), axisLabel)
             v += dbStep
         }
-        val khzStep = niceStep((f1 - f0) / 1000.0, 4) * 1000.0
+        val khzStep =
+            niceStep((f1 - f0) / 1000.0, ((right - left) / theme.dp(60f)).roundToInt().coerceIn(2, 6)) * 1000.0
         var f = ceil(f0 / khzStep) * khzStep
         axisLabel.textAlign = Paint.Align.CENTER
         while (f <= f1 + 1e-9) {
             val x = sx(f)
             canvas.drawLine(x, top, x, bottom, line)
-            canvas.drawText(String.format("%.1f", f / 1000.0), x, bottom + theme.dp(3f), axisLabel)
+            canvas.drawText(String.format("%.1f", f / 1000.0), x, bottom + theme.dp(9f), axisLabel)
             f += khzStep
         }
         line.color = theme.axis
@@ -262,7 +268,9 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
         top: Float,
         bottom: Float,
     ) {
-        val capacity = (bottom - top).roundToInt().coerceIn(1, MAX_WATERFALL_ROWS)
+        // A row is 2 dp tall: one pixel each would need five minutes of history to look full.
+        rowPx = max(1f, theme.dp(2f))
+        val capacity = ((bottom - top) / rowPx).roundToInt().coerceIn(1, MAX_WATERFALL_ROWS)
         val added = waterfall.capture(store, comp, y0, capacity)
         val width = waterfall.rowWidth
         var image = wfImage
@@ -285,7 +293,12 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
         val now = store.now()
         for (y in listOf(0, capacity / 2, capacity - 1)) {
             val at = waterfall.rowTimes.getOrNull(y) ?: continue
-            canvas.drawText(String.format("-%.1fs", now - at), left - theme.dp(4f), top + y + theme.dp(8f), axisLabel)
+            canvas.drawText(
+                String.format("-%.1fs", now - at),
+                left - theme.dp(4f),
+                min(top + y * rowPx + theme.dp(8f), bottom),
+                axisLabel,
+            )
         }
         val profile = store.profile ?: return
         axisLabel.textAlign = Paint.Align.CENTER
