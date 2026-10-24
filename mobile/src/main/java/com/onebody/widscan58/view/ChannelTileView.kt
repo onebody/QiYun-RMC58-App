@@ -9,6 +9,8 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import com.onebody.widscan58.R
+import com.onebody.widscan58.core.BadgeKind
 import com.onebody.widscan58.core.ChannelTile
 import kotlin.math.max
 import kotlin.math.min
@@ -114,9 +116,9 @@ class ChannelTileView @JvmOverloads constructor(context: Context, attrs: Attribu
         y += theme.dp(16f)
         kv.color = theme.muted
         kv.alpha = alpha
-        canvas.drawText("SNR ${fmtDb(t.snr)}", pad, y, kv)
+        canvas.drawText(context.getString(R.string.tile_snr, fmtDb(t.snr)), pad, y, kv)
         y += theme.dp(TEXT_LINE_DP)
-        canvas.drawText("floor ${fmtDb(t.floor)}", pad, y, kv)
+        canvas.drawText(context.getString(R.string.tile_floor, fmtDb(t.floor)), pad, y, kv)
 
         if (t.badges.isNotEmpty()) {
             y += theme.dp(TEXT_LINE_DP)
@@ -126,11 +128,12 @@ class ChannelTileView @JvmOverloads constructor(context: Context, attrs: Attribu
             for (b in t.badges) {
                 val tone = theme.tone.getValue(b.tone)
                 badgeText.color = tone
-                val pillW = badgeText.measureText(b.text) + theme.dp(6f)
+                val label = context.getString(BADGE_LABELS.getValue(b.kind))
+                val pillW = badgeText.measureText(label) + theme.dp(6f)
                 if (bx + pillW > right) break
                 fill.color = theme.alpha(tone, if (t.enabled) 0.18 else 0.08)
                 canvas.drawRoundRect(RectF(bx, top, bx + pillW, bottom), theme.dp(6f), theme.dp(6f), fill)
-                canvas.drawText(b.text, bx + theme.dp(3f), y, badgeText)
+                canvas.drawText(label, bx + theme.dp(3f), y, badgeText)
                 bx += pillW + theme.dp(3f)
             }
         }
@@ -184,5 +187,15 @@ class ChannelTileView @JvmOverloads constructor(context: Context, attrs: Attribu
         private const val SPARK_WINDOW_S = 10.0
         private const val SPARK_H_DP = 18f
         private const val TEXT_LINE_DP = 13f
+
+        /** The engine says what a badge means; which words to show is the app's call. */
+        private val BADGE_LABELS = mapOf(
+            BadgeKind.STALE to R.string.badge_stale,
+            BadgeKind.SIGNAL to R.string.badge_signal,
+            BadgeKind.CLIPPING to R.string.badge_clipping,
+            BadgeKind.SPUR to R.string.badge_spur,
+            BadgeKind.SPUR_MASKED to R.string.badge_spur_masked,
+            BadgeKind.FILTER_EDGE to R.string.badge_filter_edge,
+        )
     }
 }

@@ -61,6 +61,17 @@ It emits the same SPECTRUM / METRICS / TELEMETRY payloads the firmware does for 
 band of VTXs plus the board spurs, answers the band, gain and Start/Stop
 controls, and never touches the USB stack. Nothing else starts it.
 
+## Language
+
+Chinese is the default and English is the one translation: `res/values/` carries
+Chinese, `res/values-en/` English, so the app follows the system language and
+falls back to Chinese on a device set to anything else. On Android 13+ the
+system's per-app language picker offers both (`res/xml/locale_config.xml`).
+
+Unit symbols (`dBFS`, `MHz`, `SNR`), the band letters and the raw USB
+diagnostics — the probe screen and `UsbLinkException` messages — read the same in
+both, because they are what you paste into a bug report.
+
 The screen is portrait-only for now: there is no landscape layout, and rotating
 would crush the panorama into a strip.
 
@@ -100,7 +111,9 @@ store, panorama compositing, waterfall rows and channel tiles.
 The UI has been driven on an `arm64-v8a` emulator (Android 11, 1080x1920) against
 the simulated feed at 411x731 dp and, with `adb shell wm density 480`, at 360x640
 dp: empty state, band switching, dB fit, hold toggles, gain and Start/Stop all
-behave, and the waterfall fills one row per rotation.
+behave, and the waterfall fills one row per rotation. Both languages were
+screenshotted at both widths — the axis gutter is sized for the wider of
+`-29.7s` and `-44.2秒`.
 
 Not yet exercised is the real USB path — enumeration, the permission dialog, the
 `PROTOCOL MONITOR` handshake and the C5 DTR/RTS erratum — because that needs the

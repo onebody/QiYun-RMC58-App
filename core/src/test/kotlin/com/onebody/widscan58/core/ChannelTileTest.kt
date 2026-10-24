@@ -55,7 +55,7 @@ class ChannelTileTest {
         levels(1, levelOf(id = 0, rssiDb = -50.0))
         assertTrue(channelTile(store, 0, -1)!!.badges.isEmpty())
         ms += 1_500
-        assertTrue(channelTile(store, 0, -1)!!.badges.any { it.text == "stale" })
+        assertTrue(channelTile(store, 0, -1)!!.badges.any { it.kind == BadgeKind.STALE })
     }
 
     @Test
@@ -63,10 +63,10 @@ class ChannelTileTest {
         store.setProfile(profileOf())
         val flags = ChannelFlag.SIGNAL or ChannelFlag.SPUR
         levels(1, levelOf(id = 0, rssiDb = -50.0, flags = flags))
-        assertEquals("spur", channelTile(store, 0, -1)!!.badges.last().text)
+        assertEquals(BadgeKind.SPUR, channelTile(store, 0, -1)!!.badges.last().kind)
 
         store.ingest(frame(FrameType.METRICS, metricsOf(MetricChannel(0, -50.0, flags = flags, peak = -30.0))))
-        val masked = channelTile(store, 0, -1)!!.badges.first { it.text == "spur masked" }
+        val masked = channelTile(store, 0, -1)!!.badges.first { it.kind == BadgeKind.SPUR_MASKED }
         assertEquals(BadgeTone.SERIOUS, masked.tone)
     }
 

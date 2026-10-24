@@ -107,8 +107,12 @@ class Widscan58Activity : Activity() {
             band.letter to button
         }
         bandRow.addView(spacer())
-        maxChip = chip("Max").apply { setOnClickListener { prefs.showMaxHold = !prefs.showMaxHold; refresh() } }
-        avgChip = chip("Avg").apply { setOnClickListener { prefs.showAverage = !prefs.showAverage; refresh() } }
+        maxChip = chip(getString(R.string.chip_max)).apply {
+            setOnClickListener { prefs.showMaxHold = !prefs.showMaxHold; refresh() }
+        }
+        avgChip = chip(getString(R.string.chip_avg)).apply {
+            setOnClickListener { prefs.showAverage = !prefs.showAverage; refresh() }
+        }
         bandRow.addView(maxChip)
         bandRow.addView(avgChip)
 
@@ -164,7 +168,7 @@ class Widscan58Activity : Activity() {
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
         sim?.stop()
-        closeLink("paused")
+        closeLink(getString(R.string.note_paused))
     }
 
     // ---- drawing: one coalesced refresh per frame, only when the data changed ----
@@ -218,14 +222,14 @@ class Widscan58Activity : Activity() {
         val l = link
         when {
             l != null -> parts.add(l.description)
-            sim != null -> parts.add("simulated device")
+            sim != null -> parts.add(getString(R.string.status_sim))
             else -> return note.ifEmpty { getString(R.string.plug_in) }
         }
-        parts.add(store.profile?.name ?: "connecting…")
-        store.telemetry?.let { parts.add(String.format("%.0f rot/s", it.rotationHz)) }
-        store.status?.let { parts.add("${it.plan.size} hops") }
-        parts.add("gain ${store.status?.gain ?: prefs.gain}")
-        store.telemetry?.let { parts.add(String.format("link %.0f%%", it.linkFill * 100)) }
+        parts.add(store.profile?.name ?: getString(R.string.status_connecting))
+        store.telemetry?.let { parts.add(getString(R.string.status_rot, it.rotationHz)) }
+        store.status?.let { parts.add(getString(R.string.status_hops, it.plan.size)) }
+        parts.add(getString(R.string.status_gain, store.status?.gain ?: prefs.gain))
+        store.telemetry?.let { parts.add(getString(R.string.status_link, it.linkFill * 100)) }
         return parts.joinToString(" · ")
     }
 
@@ -272,11 +276,11 @@ class Widscan58Activity : Activity() {
         if (link != null) return
         val layout: CdcLayout = cdcLayoutOf(device)
             ?: run {
-                note = "${device.deviceName} has no CDC bulk pair"
+                note = getString(R.string.note_no_cdc, device.deviceName)
                 return
             }
         val opened = runCatching { UsbSerialLink.open(this, device, layout) }
-            .onFailure { note = "open failed: ${it.message}" }
+            .onFailure { note = getString(R.string.note_open_failed, it.message.orEmpty()) }
             .getOrNull() ?: return
         link = opened
         parser = StreamParser()
@@ -325,7 +329,7 @@ class Widscan58Activity : Activity() {
         l.onBytes = null
         l.onClose = null
         l.close()
-        note = "disconnected: $why"
+        note = getString(R.string.note_disconnected, why)
     }
 
     private fun command(line: String, reply: (CommandResult) -> Unit = {}) {
@@ -334,7 +338,7 @@ class Widscan58Activity : Activity() {
             return
         }
         val r = runner ?: run {
-            note = "not connected: $line"
+            note = getString(R.string.note_not_connected, line)
             return
         }
         r.send(line) { result ->
@@ -348,7 +352,7 @@ class Widscan58Activity : Activity() {
         override fun run() {
             if (link != null && SystemClock.elapsedRealtime() - lastFrameMs > NO_DATA_MS) {
                 lastFrameMs = SystemClock.elapsedRealtime()
-                note = "no data: re-arming monitor mode"
+                note = getString(R.string.note_no_data)
                 command("PROTOCOL MONITOR") { handshake() }
             }
             main.postDelayed(this, WATCHDOG_PERIOD_MS)

@@ -13,6 +13,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import com.onebody.widscan58.R
 import com.onebody.widscan58.core.Composite
 import com.onebody.widscan58.core.Store
 import com.onebody.widscan58.core.Waterfall
@@ -77,14 +78,15 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fill)
         if (store == null || profile == null || store.segments.isEmpty()) {
             lastComp = null
-            val hint = "Waiting for spectrum frames…"
+            val hint = context.getString(R.string.waiting_spectrum)
             axisLabel.textAlign = Paint.Align.CENTER
             canvas.drawText(hint, width / 2f, height / 2f, axisLabel)
             axisLabel.textAlign = Paint.Align.LEFT
             return
         }
 
-        val left = theme.dp(30f)
+        // The gutter is sized for the widest axis label in either language: -23.5秒 is 28 sp.
+        val left = theme.dp(34f)
         val right = width - theme.dp(8f)
         val wfHeight = (height * 0.34f).coerceIn(theme.dp(56f), theme.dp(140f))
         spectrumTop = theme.dp(16f)
@@ -123,7 +125,7 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
 
         unit.textAlign = Paint.Align.LEFT
         unit.color = theme.muted
-        canvas.drawText("dBFS/bin", theme.dp(2f), spectrumTop - theme.dp(5f), unit)
+        canvas.drawText(context.getString(R.string.axis_dbfs_bin), theme.dp(2f), spectrumTop - theme.dp(5f), unit)
 
         drawWaterfall(canvas, store, comp, left, right, wfTop, waterfallBottom)
     }
@@ -294,7 +296,7 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
         for (y in listOf(0, capacity / 2, capacity - 1)) {
             val at = waterfall.rowTimes.getOrNull(y) ?: continue
             canvas.drawText(
-                String.format("-%.1fs", now - at),
+                context.getString(R.string.waterfall_age, now - at),
                 left - theme.dp(4f),
                 min(top + y * rowPx + theme.dp(8f), bottom),
                 axisLabel,

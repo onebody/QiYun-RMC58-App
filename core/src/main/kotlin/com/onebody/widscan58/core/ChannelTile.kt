@@ -7,18 +7,25 @@ import kotlin.math.min
 
 enum class BadgeTone { GOOD, WARNING, SERIOUS, CRITICAL }
 
-class TileBadge(val text: String, val tone: BadgeTone)
+/** What a badge means. The label is a UI concern: the app resolves these to text. */
+enum class BadgeKind { STALE, SIGNAL, CLIPPING, SPUR, SPUR_MASKED, FILTER_EDGE }
+
+class TileBadge(val kind: BadgeKind, val tone: BadgeTone)
 
 /** In FULL metrics a spur is masked out of the search; in RSSI/SNR it is only flagged. */
 fun badgesFor(flags: Int, stale: Boolean, masked: Boolean): List<TileBadge> {
     val out = ArrayList<TileBadge>(5)
-    if (stale) out += TileBadge("stale", BadgeTone.WARNING)
-    if (flags and ChannelFlag.SIGNAL != 0) out += TileBadge("signal", BadgeTone.GOOD)
-    if (flags and ChannelFlag.SATURATED != 0) out += TileBadge("clipping", BadgeTone.CRITICAL)
+    if (stale) out += TileBadge(BadgeKind.STALE, BadgeTone.WARNING)
+    if (flags and ChannelFlag.SIGNAL != 0) out += TileBadge(BadgeKind.SIGNAL, BadgeTone.GOOD)
+    if (flags and ChannelFlag.SATURATED != 0) out += TileBadge(BadgeKind.CLIPPING, BadgeTone.CRITICAL)
     if (flags and ChannelFlag.SPUR != 0) {
-        out += if (masked) TileBadge("spur masked", BadgeTone.SERIOUS) else TileBadge("spur", BadgeTone.WARNING)
+        out += if (masked) {
+            TileBadge(BadgeKind.SPUR_MASKED, BadgeTone.SERIOUS)
+        } else {
+            TileBadge(BadgeKind.SPUR, BadgeTone.WARNING)
+        }
     }
-    if (flags and ChannelFlag.EDGE != 0) out += TileBadge("filter edge", BadgeTone.WARNING)
+    if (flags and ChannelFlag.EDGE != 0) out += TileBadge(BadgeKind.FILTER_EDGE, BadgeTone.WARNING)
     return out
 }
 
