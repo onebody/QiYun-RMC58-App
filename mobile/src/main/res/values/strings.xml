@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Widscan58</string>
+    <string name="probe_name">USB probe</string>
+    <string name="plug_in">Plug in the Widscan58 board over USB-C.</string>
+    <string name="holds">Holds</string>
+    <string name="scan_start">Start</string>
+    <string name="scan_stop">Stop</string>
+</resources>
