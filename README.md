@@ -115,9 +115,16 @@ behave, and the waterfall fills one row per rotation. Both languages were
 screenshotted at both widths — the axis gutter is sized for the wider of
 `-29.7s` and `-44.2秒`.
 
+The language switch itself was checked the way a device does it, not by renaming
+resource directories: `settings put system system_locales zh-CN` plus a reboot
+puts `[zh_CN]` into the activity's `mCurrentConfig`, and the same path back to
+`en-US` renders English again.
+
 Not yet exercised is the real USB path — enumeration, the permission dialog, the
 `PROTOCOL MONITOR` handshake and the C5 DTR/RTS erratum — because that needs the
-board on a phone.
+board on a phone. The Android 13+ per-app language picker is likewise unproven:
+the emulator runs Android 11, and the Android 16 phone available here refuses
+`adb install` until USB installation is switched on by hand.
 
 ## License
 
