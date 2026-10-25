@@ -73,6 +73,7 @@ class Widscan58Activity : Activity() {
     private var runner: CommandRunner? = null
     private var parser: StreamParser? = null
     private var selected = -1
+    private var zoom: ZoomSheet? = null
     private var draggingGain = false
     private var lastFrameMs = 0L
     private var drawnVersion = -1L
@@ -127,7 +128,8 @@ class Widscan58Activity : Activity() {
         bandRow.addView(setupButton)
         sheet = SettingsSheet(this, prefs, ::applySetting, ::refresh, ::planNames, ::applyPlan)
 
-        tiles.forEach { it.onPick = { id -> selected = id; refresh() } }
+        // A tile is a button: it opens the channel's own chart. The panorama stays a scrubber.
+        tiles.forEach { it.onPick = { id -> selected = id; refresh(); openZoom(id) } }
         scanButton.setOnClickListener { toggleScan() }
         holdsButton.text = getString(R.string.holds)
         holdsButton.setOnClickListener { store.resetHolds() }
@@ -179,6 +181,7 @@ class Widscan58Activity : Activity() {
     override fun onPause() {
         super.onPause()
         sheet?.dismiss()
+        zoom?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
         sim?.stop()
@@ -229,6 +232,7 @@ class Widscan58Activity : Activity() {
         gainBar.isEnabled = live
         setupButton.isEnabled = live
         sheet?.update(store.status)
+        zoom?.update()
         statusLine.text = status()
     }
 
@@ -294,6 +298,16 @@ class Widscan58Activity : Activity() {
             return
         }
         sheet?.show(store.status)
+    }
+
+    /** A tile opens that channel's chart, and its stepper moves the rest of the screen with it. */
+    private fun openZoom(id: Int) {
+        if (store.profile?.channels?.getOrNull(id) == null) return
+        zoom?.dismiss()
+        zoom = ZoomSheet(this, prefs, store) { picked ->
+            selected = picked
+            refresh()
+        }.also { it.show(id) }
     }
 
     /** One write, then the reply that lets the form show the device's state instead of our request. */

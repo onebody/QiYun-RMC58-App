@@ -100,4 +100,20 @@
     <string name="set_db_min">min</string>
     <string name="set_db_max">max</string>
     <string name="set_device">Device</string>
+
+    <string name="zoom_title">Channel zoom</string>
+    <string name="zoom_channel">%1$s · %2$s MHz</string>
+    <string name="zoom_axis">dBFS/bin · offset from nominal, MHz</string>
+    <string name="zoom_nominal">Nominal</string>
+    <string name="zoom_occupied">Most occupied</string>
+    <string name="zoom_center">Video centre</string>
+    <string name="zoom_rssi">RSSI</string>
+    <string name="zoom_ema">EMA</string>
+    <string name="zoom_snr">SNR</string>
+    <string name="zoom_floor">floor</string>
+    <string name="zoom_peak">peak</string>
+    <string name="zoom_obw">OBW</string>
+    <string name="zoom_prev">Previous channel</string>
+    <string name="zoom_next">Next channel</string>
+    <string name="waiting_metrics">Waiting for metrics…</string>
 </resources>

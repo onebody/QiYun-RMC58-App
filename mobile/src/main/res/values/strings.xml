@@ -102,4 +102,20 @@
     <string name="set_db_min">下限</string>
     <string name="set_db_max">上限</string>
     <string name="set_device">设备</string>
+
+    <string name="zoom_title">频道细节</string>
+    <string name="zoom_channel">%1$s · %2$s MHz</string>
+    <string name="zoom_axis">dBFS/格 · 偏移 MHz</string>
+    <string name="zoom_nominal">标称</string>
+    <string name="zoom_occupied">最忙</string>
+    <string name="zoom_center">中心</string>
+    <string name="zoom_rssi">电平</string>
+    <string name="zoom_ema">平滑</string>
+    <string name="zoom_snr">信噪比</string>
+    <string name="zoom_floor">底噪</string>
+    <string name="zoom_peak">峰值</string>
+    <string name="zoom_obw">占用带宽</string>
+    <string name="zoom_prev">上一个频道</string>
+    <string name="zoom_next">下一个频道</string>
+    <string name="waiting_metrics">等待通道数据…</string>
 </resources>
