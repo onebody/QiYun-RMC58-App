@@ -279,4 +279,38 @@
     <string name="rh_entering">正在进入计圈模式…</string>
     <string name="rh_start_failed">进入计圈模式失败：%1$s</string>
     <string name="rh_need_board">模拟设备不能计圈：请连接板卡，或用 --ez rh true 启动模拟计圈。</string>
+
+    <!-- 功率计模式：dBFS 经板卡校准换成 dBm -->
+    <string name="power_title">功率计</string>
+    <string name="power_attenuator">衰减器</string>
+    <string name="power_db">dB</string>
+    <string name="power_smooth">平滑</string>
+    <string name="power_smooth_off">关</string>
+    <string name="power_all">全部</string>
+    <string name="power_none">全不</string>
+    <string name="power_measure">测量此通道</string>
+    <string name="power_at_board">板端</string>
+    <string name="power_level">电平</string>
+    <string name="power_noise">噪声</string>
+    <string name="power_over">过载</string>
+    <string name="power_stale">数据过期</string>
+    <string name="power_clipping">削波</string>
+    <string name="power_no_signal">无信号</string>
+    <string name="power_over_range">超量程</string>
+    <string name="power_uncalibrated">未校准</string>
+    <string name="power_no_calibration">这块板（%1$s）没有功率校准：功率计模式需要 ESP32-C5 板卡。</string>
+    <string name="power_not_ready">设备现在不是测量用的那套扫描（增益、窗口或 LO 模式被改过）：退出后重新进入即可重新设置。</string>
+    <string name="power_disclaimer">功率值来自单块 C5 的校准，只是近似值。</string>
+    <string name="power_guide">衰减器对照</string>
+    <string name="power_guide_warn">必须经衰减器连接 VTX</string>
+    <string name="power_guide_intro">直接把 VTX 接到板卡会烧毁它的接收端。先接好衰减器，再给 VTX 上电；VTX 输出端没有任何负载时绝不通电。按下表选择至少足够的衰减量，并在设置里填入你实际用的衰减量。</string>
+    <string name="power_guide_range">ESP 大约能读 −32 dBm 到 −5 dBm。注意很多衰减器标称的衰减量并不准——把读数当作你这套测量链路下的相对功率即可。</string>
+    <string name="power_col_vtx">VTX 功率</string>
+    <string name="power_col_atten">衰减器</string>
+    <string name="power_col_board">板端</string>
+    <string name="power_col_rating">耐功率</string>
+    <string name="power_rating">%1$s+</string>
+    <string name="power_exit">退出功率计</string>
+    <string name="power_entering">正在设置功率扫描…</string>
+    <string name="power_left">已退出功率计</string>
 </resources>

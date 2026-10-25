@@ -138,10 +138,25 @@ class Prefs(context: Context) : RhSettings {
         get() = sp.getInt("voicePitch", 10)
         set(value) = sp.edit().putInt("voicePitch", value.coerceIn(5, 20)).apply()
 
+    // ---- Power meter mode ----
+
+    /** What sits between the VTX and the board: the meter adds it back to get the VTX's own power. */
+    var powerAttenDb: Int
+        get() = sp.getInt("powerAttenDb", 30)
+        set(value) = sp.edit().putInt("powerAttenDb", value.coerceIn(0, POWER_ATTEN_MAX)).apply()
+
+    /** Seconds of linear-power averaging; 0 shows the latest hop as it is. */
+    var powerSmoothS: Double
+        get() = sp.getFloat("powerSmoothS", 0.5f).toDouble()
+        set(value) = sp.edit().putFloat("powerSmoothS", value.toFloat()).apply()
+
     private fun put(key: String, value: String) = sp.edit().putString(key, value).apply()
 
     companion object {
         /** The ceiling used until the board reports its own `gain_max`. */
         const val GAIN_MAX = DeviceCommands.GAIN_FALLBACK_MAX
+
+        /** The largest attenuator the guide table rates anyone would fit. */
+        const val POWER_ATTEN_MAX = 90
     }
 }

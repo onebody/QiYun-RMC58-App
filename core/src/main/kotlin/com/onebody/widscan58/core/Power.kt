@@ -44,12 +44,29 @@ object Power {
 
     /** Monitor mode's windows and spectrum per profile, put back on leaving power meter mode
      *  when no snapshot of the user's own scan is at hand. */
-    class MonitorRestore(val rssiHz: Long, val searchHz: Long, val spec: String)
+    class MonitorRestore(val rssiHz: Long, val searchHz: Long, val spec: String) {
+        fun commands(): List<String> = listOf(DeviceCommands.windows(rssiHz, searchHz), spec)
+    }
 
     val MONITOR_DEFAULTS = mapOf(
         "c5-race" to MonitorRestore(5_000_000L, 12_000_000L, "SPEC 4 256 40000000 MAX"),
         "s3-race24" to MonitorRestore(1_410_000L, 3_390_000L, "SPEC 4 256 11300000 MAX"),
     )
+
+    /** The scan this mode set up: the calibration's window, and no spectrum hops between LOs. */
+    fun isPowerScan(status: Status?): Boolean =
+        status != null && status.rssiHz == WIN_HZ && status.specEvery == 0
+
+    /** The running scan worth snapshotting on entry; null when this already is the power scan,
+     *  which would otherwise restore itself and lose the monitor windows for good. */
+    fun monitorScan(status: Status?): MonitorRestore? =
+        status?.takeIf { !isPowerScan(it) }?.let {
+            MonitorRestore(
+                it.rssiHz,
+                it.searchHz,
+                DeviceCommands.spectrum(it.specEvery, it.specBins, it.specSpanHz, it.specDetector != 0),
+            )
+        }
 
     /** dBm at the board's RF input minus dBFS at [GAIN], by channel MHz.
      *  From 2026-10-19 (`tools/powercal.py` against an ImmersionRC RF Power Meter v2, the mean

@@ -277,4 +277,38 @@
     <string name="rh_entering">Entering lap-timing mode…</string>
     <string name="rh_start_failed">Could not enter lap-timing mode: %1$s</string>
     <string name="rh_need_board">Lap timing needs a board: connect one, or start the RotorHazard simulator.</string>
+
+    <!-- Power meter mode: the board's dBFS turned into dBm by its calibration -->
+    <string name="power_title">Power meter</string>
+    <string name="power_attenuator">Attenuator</string>
+    <string name="power_db">dB</string>
+    <string name="power_smooth">Smoothing</string>
+    <string name="power_smooth_off">Off</string>
+    <string name="power_all">All</string>
+    <string name="power_none">None</string>
+    <string name="power_measure">Measure this channel</string>
+    <string name="power_at_board">at the board</string>
+    <string name="power_level">level</string>
+    <string name="power_noise">noise</string>
+    <string name="power_over">OVER</string>
+    <string name="power_stale">stale</string>
+    <string name="power_clipping">clipping</string>
+    <string name="power_no_signal">no signal</string>
+    <string name="power_over_range">over range</string>
+    <string name="power_uncalibrated">uncalibrated</string>
+    <string name="power_no_calibration">This board (%1$s) has no power calibration: power meter mode needs an ESP32-C5 board.</string>
+    <string name="power_not_ready">The device is not set up for power measurement (gain, window or LO mode changed): leave this mode and enter it again to set it up.</string>
+    <string name="power_disclaimer">Power values are approximate from a calibration with a single C5.</string>
+    <string name="power_guide">Attenuator guide</string>
+    <string name="power_guide_warn">Always connect the VTX through an attenuator</string>
+    <string name="power_guide_intro">Connecting a VTX directly to the board destroys its receiver. Fit the attenuator before powering the VTX, and never power a VTX with nothing on its output. Use at least the attenuation below for the VTX\'s power, and enter the attenuation you use in the settings.</string>
+    <string name="power_guide_range">The ESP can read from about −32 dBm to −5 dBm. Note that many attenuators misreport their power reduction — take the reported power as simply a relative power reading for your measurement setup.</string>
+    <string name="power_col_vtx">VTX power</string>
+    <string name="power_col_atten">Attenuator</string>
+    <string name="power_col_board">At the board</string>
+    <string name="power_col_rating">Rating</string>
+    <string name="power_rating">%1$s+</string>
+    <string name="power_exit">Leave power meter</string>
+    <string name="power_entering">Setting up the power scan…</string>
+    <string name="power_left">Left power meter mode</string>
 </resources>

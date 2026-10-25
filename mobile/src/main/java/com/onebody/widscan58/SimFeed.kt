@@ -272,7 +272,9 @@ class SimFeed(
         val hops = hops()
         val first = plan.first()
         val profile = Profile(
-            name = "sim-${first.name.take(1)}",
+            // The board's own profile name, as the web's mock device uses it: the dBm calibration
+            // is keyed by it, so a simulator called "sim" could never be a power meter.
+            name = "c5-race",
             description = "Raceband R1-R8 [SIMULATED]",
             target = "esp32-c5",
             bandKhz = longArrayOf(plan.minOf { it.khz } - 40_000, plan.maxOf { it.khz } + 40_000),
@@ -287,7 +289,7 @@ class SimFeed(
             channels = plan,
         )
         val status = Status(
-            profile = "sim",
+            profile = "c5-race",
             running = if (running) 1 else 0,
             enabled = cfg.enabled,
             mode = cfg.mode,

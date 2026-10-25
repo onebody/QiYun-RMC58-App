@@ -28,6 +28,7 @@ import com.onebody.widscan58.core.DropWindow
 import com.onebody.widscan58.core.GainMode
 import com.onebody.widscan58.core.LinkRate
 import com.onebody.widscan58.core.LogDir
+import com.onebody.widscan58.core.Power
 import com.onebody.widscan58.core.RhLink
 import com.onebody.widscan58.core.RhLinkError
 import com.onebody.widscan58.core.RhSerialLink
@@ -95,6 +96,12 @@ class Widscan58Activity : Activity() {
     private var console: ConsoleSheet? = null
     private var gpio: GpioSheet? = null
     private var session: SessionSheet? = null
+
+    /** Power meter mode: the board runs the calibration's scan while the page is open. */
+    private var power: PowerSheet? = null
+    private var monitorScan: Power.MonitorRestore? = null
+    /** True while the entry note waits for the board to report the calibration scan running. */
+    private var awaitPowerScan = false
 
     /** The RotorHazard session, if the board is in that mode: while it runs, it owns the wire. */
     private var rh: RhFeed? = null
@@ -231,6 +238,8 @@ class Widscan58Activity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        // The meter's page ends with the session, and its scan goes back while the wire is still up.
+        leavePower()
         sheet?.dismiss()
         zoom?.dismiss()
         history?.dismiss()
@@ -269,6 +278,10 @@ class Widscan58Activity : Activity() {
     }
 
     private fun refresh() {
+        if (awaitPowerScan && Power.scanIsReady(store.status)) {
+            awaitPowerScan = false
+            note = ""
+        }
         sampleLink()
         panorama.selected = selected
         panorama.dbMin = prefs.dbMin.toDouble()
@@ -308,6 +321,7 @@ class Widscan58Activity : Activity() {
         gpio?.update()
         session?.update()
         rhSheet?.update()
+        power?.update()
         statusLine.text = status()
     }
 
@@ -325,6 +339,8 @@ class Widscan58Activity : Activity() {
         }
         // The board is answering a different protocol than the instrument's own frames.
         if (rh != null) return (parts + getString(R.string.rh_title)).joinToString(" · ")
+        // The meter runs the calibration's scan, not this profile's own.
+        if (power != null) parts.add(getString(R.string.power_title))
         parts.add(store.profile?.name ?: getString(R.string.status_connecting))
         store.telemetry?.let { parts.add(getString(R.string.status_rot, it.rotationHz)) }
         store.status?.let { parts.add(getString(R.string.status_hops, it.plan.size)) }
@@ -403,6 +419,7 @@ class Widscan58Activity : Activity() {
         menu.menu.add(0, MENU_GPIO, 0, R.string.gpio_title)
         menu.menu.add(0, MENU_SESSION, 0, R.string.session_title)
         menu.menu.add(0, MENU_RH, 0, R.string.rh_title)
+        menu.menu.add(0, MENU_POWER, 0, R.string.power_title)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_SCALE -> panorama.autoScale()
@@ -412,6 +429,7 @@ class Widscan58Activity : Activity() {
                 MENU_GPIO -> openGpio()
                 MENU_SESSION -> openSession()
                 MENU_RH -> openRh()
+                MENU_POWER -> openPower()
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -440,6 +458,67 @@ class Widscan58Activity : Activity() {
         }
         gpio?.dismiss()
         gpio = GpioSheet(this, store, ::applyGpio).also { it.show() }
+    }
+
+    // ---- power meter mode ----
+
+    /** The meter is a different scan on the same wire, so it needs a live one. */
+    private fun openPower() {
+        if (feed.started) {
+            note = getString(R.string.note_replay_readonly)
+            refresh()
+            return
+        }
+        if (link == null && sim == null) {
+            note = getString(R.string.plug_in)
+            refresh()
+            return
+        }
+        // Reopening from the menu keeps the mode: dismiss() clears the page's own exit path first.
+        power?.dismiss()
+        val sheet = PowerSheet(this, prefs, store, ::applyGpio, ::applyPlan)
+        // Closing the page is leaving the mode: the board's own scan goes back with it.
+        sheet.onDismissed = { leavePower() }
+        power = sheet
+        sheet.show()
+        enterPower()
+    }
+
+    /** The scan the calibration was measured with: one LO, manual gain 0, a ±15 MHz window. */
+    private fun enterPower() {
+        Power.monitorScan(store.status)?.let { monitorScan = it }
+        Power.commands(store.profile?.usableHz ?: SPEC_FULL_SPAN_HZ).forEach { command(it) }
+        command("PROFILE?")
+        command("STATUS?")
+        awaitPowerScan = true
+        note = getString(R.string.power_entering)
+        refresh()
+    }
+
+    private fun leavePower() {
+        val sheet = power ?: return
+        power = null
+        sheet.dismiss()
+        // Only a board that is still here can be handed its scan back.
+        if (link != null || sim != null) restoreMonitorScan()
+        monitorScan = null
+        awaitPowerScan = false
+        note = getString(R.string.power_left)
+        refresh()
+    }
+
+    /** What the instrument was sweeping before the meter took over, or the profile's own default. */
+    private fun restoreMonitorScan() {
+        if (!Power.isPowerScan(store.status)) return
+        val restore = monitorScan ?: store.profile?.name?.let { Power.MONITOR_DEFAULTS[it] } ?: return
+        // The meter wrote MODE and GAIN too; the web gets those back by restoring on reconnect,
+        // which a phone that stays plugged in never gets.
+        val settings = prefs.deviceSettings()
+        command(DeviceCommands.mode(settings.mode))
+        command(DeviceCommands.gain(settings.gainMode, settings.gain, gainBar.max))
+        restore.commands().forEach { command(it) }
+        command("PROFILE?")
+        command("STATUS?")
     }
 
     /** Record the wire, play a capture back, or hand the readings to a spreadsheet. */
@@ -780,6 +859,8 @@ class Widscan58Activity : Activity() {
         link = null
         // The session writes to this port, so it goes before the port does.
         endRh()
+        // The link is gone, so this only closes the page; there is no board left to hand a scan back.
+        leavePower()
         parser = null
         runner?.failAll("link closed")
         runner = null
@@ -864,6 +945,10 @@ class Widscan58Activity : Activity() {
         private const val MENU_GPIO = 5
         private const val MENU_SESSION = 6
         private const val MENU_RH = 7
+        private const val MENU_POWER = 8
+
+        /** The meter's spectrum span before a profile has said what it can tune. */
+        private const val SPEC_FULL_SPAN_HZ = 40_000_000L
         private const val REQ_SAVE_SESSION = 20
         private const val REQ_SAVE_CHANNELS = 21
         private const val REQ_SAVE_SPECTRUM = 22

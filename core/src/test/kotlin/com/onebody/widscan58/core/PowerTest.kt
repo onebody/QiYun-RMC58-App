@@ -26,6 +26,7 @@ class PowerTest {
         gain: Int = Power.GAIN,
         rssiHz: Long = Power.WIN_HZ,
         mode: String = "SINGLE",
+        specEvery: Int? = null,
     ) = statusOf(5_658_000).let { s ->
         Status(
             profile = s.profile, running = s.running, enabled = s.enabled, mode = mode,
@@ -35,7 +36,7 @@ class PowerTest {
             gainMax = s.gainMax, rawiqMax = s.rawiqMax, recal = s.recal, metrics = s.metrics,
             rssiHz = rssiHz, searchHz = s.searchHz, dcGuard = s.dcGuard, ema = s.ema,
             clearEma = s.clearEma, signalDb = s.signalDb, avgShift = s.avgShift,
-            specEvery = s.specEvery, specBins = s.specBins, specSpanHz = s.specSpanHz,
+            specEvery = specEvery ?: s.specEvery, specBins = s.specBins, specSpanHz = s.specSpanHz,
             specDetector = s.specDetector, plan = s.plan,
         )
     }
@@ -65,8 +66,26 @@ class PowerTest {
     }
 
     @Test
-    fun `the calibration interpolates between the measured channels`() {
-        assertEquals(27.4, Power.calOffset("c5-race", 5658)!!.db, 1e-9)
+    fun `a scan is the meter's by its window and its spectrum hops`() {
+        assertFalse(Power.isPowerScan(statusOf(5_658_000)))
+        assertFalse(Power.isPowerScan(null))
+        assertTrue(Power.isPowerScan(powerStatus(specEvery = 0)))
+    }
+
+    @Test
+    fun `entering the meter snapshots the running scan, but never itself`() {
+        val monitor = statusOf(5_658_000)
+        val snapshot = Power.monitorScan(monitor)!!
+        assertEquals(
+            listOf("WIN ${monitor.rssiHz} ${monitor.searchHz}", "SPEC 4 256 40000000 MEAN"),
+            snapshot.commands(),
+        )
+        assertNull(Power.monitorScan(powerStatus(specEvery = 0)))
+        assertNull(Power.monitorScan(null))
+    }
+
+    @Test
+    fun `the calibration interpolates between the measured channels`() {        assertEquals(27.4, Power.calOffset("c5-race", 5658)!!.db, 1e-9)
         assertEquals(25.2, Power.calOffset("c5-race", 5880)!!.db, 1e-9)
         // 5750 MHz lies between 5732/26.8 and 5769/26.1.
         assertEquals(26.8 + (26.1 - 26.8) * 18 / 37, Power.calOffset("c5-race", 5750)!!.db, 1e-9)

@@ -11,8 +11,8 @@ android {
         applicationId = "com.onebody.widscan58"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4-dev"
+        versionCode = 5
+        versionName = "0.5-dev"
     }
 
     buildTypes {
