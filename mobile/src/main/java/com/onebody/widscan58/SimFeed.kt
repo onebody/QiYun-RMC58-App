@@ -196,7 +196,14 @@ class SimFeed(
                 obwHz = if (occupied) -4_500_000L..4_500_000L else null,
             )
         }
-        return metricsPayload(ch.khz, hop % hops.size, hops.size, cfg.gain, records)
+        return metricsPayload(
+            ch.khz, hop % hops.size, hops.size, cfg.gain, records,
+            // A hop costs a different amount each time, and once in a while the FFT waits
+            // for a settle: a flat band would make the per-hop chart look broken.
+            tuneUs = rnd.nextLong(450, 780),
+            captureUs = if (rnd.nextDouble() < 0.06) rnd.nextLong(1_400, 2_600) else rnd.nextLong(700, 1_150),
+            dspUs = rnd.nextLong(260, 520),
+        )
     }
 
     private fun emitTelemetry() {
@@ -333,11 +340,14 @@ class SimFeed(
             hops: Int,
             gain: Int,
             channels: List<MetricRecord>,
+            tuneUs: Long = 600,
+            captureUs: Long = 900,
+            dspUs: Long = 350,
         ): ByteArray {
             val p = ByteArray(34 + 26 * channels.size)
             val b = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
             b.putInt(0, 3).putInt(4, 100).putInt(8, loKhz.toInt())
-                .putInt(12, 600).putInt(16, 900).putInt(20, 350)
+                .putInt(12, tuneUs.toInt()).putInt(16, captureUs.toInt()).putInt(20, dspUs.toInt())
                 .putShort(24, 1).putShort(26, (FLOOR_DB * 100).roundToInt().toShort())
                 .putShort(28, (-8400).toShort())
             p[30] = gain.toByte()

@@ -30,10 +30,19 @@ internal fun spectrumOf(
 internal fun levelOf(id: Int, flags: Int = 0, rssiDb: Double, snrDb: Double? = null) =
     intArrayOf(id, flags, levelCode(rssiDb), if (snrDb == null) 0 else (snrDb * 4).roundToInt())
 
-internal fun levelsOf(loKhz: Long, mode: Int, perBinFloor: Int = 0, vararg levels: IntArray): ByteArray {
+internal fun levelsOf(
+    loKhz: Long,
+    mode: Int,
+    perBinFloor: Int = 0,
+    vararg levels: IntArray,
+    tuneUs: Long = 100,
+    captureUs: Long = 200,
+    dspUs: Long = 50,
+): ByteArray {
     val p = ByteArray(32 + 4 * levels.size)
     val b = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
     b.putInt(0, 7).putInt(4, 100).putInt(8, loKhz.toInt())
+    b.putInt(12, tuneUs.toInt()).putInt(16, captureUs.toInt()).putInt(20, dspUs.toInt())
     p[29] = mode.toByte()
     p[30] = perBinFloor.toByte()
     p[31] = levels.size.toByte()
@@ -63,10 +72,17 @@ internal class MetricChannel(
     val obwHz: LongRange? = null,
 )
 
-internal fun metricsOf(vararg channels: MetricChannel, loKhz: Long = 5_658_000): ByteArray {
+internal fun metricsOf(
+    vararg channels: MetricChannel,
+    loKhz: Long = 5_658_000,
+    tuneUs: Long = 100,
+    captureUs: Long = 200,
+    dspUs: Long = 50,
+): ByteArray {
     val p = ByteArray(34 + 26 * channels.size)
     val b = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
     b.putInt(0, 3).putInt(4, 100).putInt(8, loKhz.toInt())
+    b.putInt(12, tuneUs.toInt()).putInt(16, captureUs.toInt()).putInt(20, dspUs.toInt())
     p[30] = 45 // gain
     p[31] = 0 // hop index
     p[32] = 1 // hops

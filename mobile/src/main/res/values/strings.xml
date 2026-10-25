@@ -119,7 +119,6 @@
     <string name="zoom_next">下一个频道</string>
     <string name="waiting_metrics">等待通道数据…</string>
 
-    <string name="chip_history">历史</string>
     <string name="history_title">RSSI 历史</string>
     <string name="history_axis">dBFS/格 · 秒前</string>
     <string name="history_span">%1$d 秒</string>
@@ -128,4 +127,33 @@
     <string name="history_clear">取消指针</string>
     <string name="history_hint">在图上拖动即可读数</string>
     <string name="waiting_history">该时刻没有采样</string>
+
+    <string name="chip_more">⋯</string>
+    <string name="more_views">其他视图</string>
+    <string name="telemetry_title">扫描器遥测</string>
+    <string name="stat_rotation">旋转速率</string>
+    <string name="stat_hop">每跳耗时</string>
+    <string name="stat_tune">调谐</string>
+    <string name="stat_capture">采集</string>
+    <string name="stat_dsp">DSP</string>
+    <string name="stat_link">设备发送队列</string>
+    <string name="stat_usb">链路吞吐</string>
+    <string name="stat_err">错误</string>
+    <string name="stat_heap">空闲堆</string>
+    <string name="sub_hops">%1$d 跳计划 · %2$s 跳/秒</string>
+    <string name="sub_max">峰值 %1$s</string>
+    <string name="sub_samples">%1$d 样本</string>
+    <string name="sub_dropped">最近 10 秒丢弃 %1$d · 开机以来 %2$d</string>
+    <string name="sub_total_mib">累计 %1$s MiB</string>
+    <string name="sub_resync">采集错误 %1$d · 重同步 %2$d 字节</string>
+    <string name="sub_internal_ram">内部 RAM</string>
+    <string name="no_link">没有串口链路</string>
+    <string name="waiting_telemetry">等待遥测数据…</string>
+    <string name="hop_timing_title">每跳耗时分解</string>
+    <string name="hop_axis">毫秒 · 每一跳</string>
+    <string name="hop_span">最近 %1$d 跳</string>
+    <string name="hop_cursor">倒数第 %1$d 跳</string>
+    <string name="hop_total">合计</string>
+    <string name="hop_clear">取消指针</string>
+    <string name="hop_hint">在图上拖动查看单跳分解</string>
 </resources>

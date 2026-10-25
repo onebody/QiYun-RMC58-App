@@ -117,7 +117,6 @@
     <string name="zoom_next">Next channel</string>
     <string name="waiting_metrics">Waiting for metrics…</string>
 
-    <string name="chip_history">History</string>
     <string name="history_title">RSSI history</string>
     <string name="history_axis">dBFS/bin · seconds ago</string>
     <string name="history_span">%1$d s</string>
@@ -126,4 +125,33 @@
     <string name="history_clear">Clear crosshair</string>
     <string name="history_hint">Drag across the chart to read values</string>
     <string name="waiting_history">No sample at that time</string>
+
+    <string name="chip_more">⋯</string>
+    <string name="more_views">More views</string>
+    <string name="telemetry_title">Scanner telemetry</string>
+    <string name="stat_rotation">Rotation rate</string>
+    <string name="stat_hop">Hop time</string>
+    <string name="stat_tune">Tune</string>
+    <string name="stat_capture">Capture</string>
+    <string name="stat_dsp">DSP</string>
+    <string name="stat_link">Device TX queue</string>
+    <string name="stat_usb">Link throughput</string>
+    <string name="stat_err">Errors</string>
+    <string name="stat_heap">Free heap</string>
+    <string name="sub_hops">%1$d hops · %2$s hops/s</string>
+    <string name="sub_max">max %1$s</string>
+    <string name="sub_samples">%1$d samples</string>
+    <string name="sub_dropped">%1$d dropped in last 10 s · %2$d since boot</string>
+    <string name="sub_total_mib">%1$s MiB total</string>
+    <string name="sub_resync">%1$d capture · %2$d resync B</string>
+    <string name="sub_internal_ram">internal RAM</string>
+    <string name="no_link">no serial link</string>
+    <string name="waiting_telemetry">Waiting for telemetry…</string>
+    <string name="hop_timing_title">Per-hop time breakdown</string>
+    <string name="hop_axis">ms · per hop</string>
+    <string name="hop_span">last %1$d hops</string>
+    <string name="hop_cursor">hop −%1$d</string>
+    <string name="hop_total">total</string>
+    <string name="hop_clear">Clear crosshair</string>
+    <string name="hop_hint">Drag across the chart to read one hop</string>
 </resources>

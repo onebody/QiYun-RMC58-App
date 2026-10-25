@@ -67,6 +67,9 @@ class Store(
         private set
     val segments = LinkedHashMap<Long, Segment>()
 
+    /** The last hops' time breakdown, oldest first: what the per-hop chart draws. */
+    val hopTimes = ArrayList<Hop>()
+
     /** Per-bin noise floor (dBFS) measured at each LO. */
     val floorByLo = LinkedHashMap<Long, Double>()
     var spursKhz: List<Double> = emptyList()
@@ -146,6 +149,8 @@ class Store(
 
     private fun onMetrics(m: Metrics) {
         lastMetrics = m
+        hopTimes += Hop(m.tuneUs, m.captureUs, m.dspUs)
+        while (hopTimes.size > HOP_HISTORY) hopTimes.removeAt(0)
         val floor = m.floorBin
         if (floor == null) floorByLo.remove(m.loKhz) else floorByLo[m.loKhz] = floor
         val t = now()
@@ -187,6 +192,8 @@ class Store(
     companion object {
         private const val AVG_ALPHA = 0.05
         private const val SEGMENT_TIMEOUT_S = 3.0
+        /** The web keeps 400 hops and draws the last 300 of them. */
+        const val HOP_HISTORY = 400
     }
 }
 

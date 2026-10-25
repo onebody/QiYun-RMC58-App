@@ -14,6 +14,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.SeekBar
 import android.widget.TextView
 import com.onebody.widscan58.core.Bands
@@ -21,7 +22,9 @@ import com.onebody.widscan58.core.Cancellable
 import com.onebody.widscan58.core.CommandResult
 import com.onebody.widscan58.core.CommandRunner
 import com.onebody.widscan58.core.DeviceCommands
+import com.onebody.widscan58.core.DropWindow
 import com.onebody.widscan58.core.GainMode
+import com.onebody.widscan58.core.LinkRate
 import com.onebody.widscan58.core.Scheduler
 import com.onebody.widscan58.core.StreamItem
 import com.onebody.widscan58.core.StreamParser
@@ -66,9 +69,14 @@ class Widscan58Activity : Activity() {
     private lateinit var gainValue: TextView
     private lateinit var maxChip: Button
     private lateinit var avgChip: Button
-    private lateinit var historyChip: Button
+    private lateinit var moreChip: Button
     private var sheet: SettingsSheet? = null
     private var history: HistorySheet? = null
+    private var telemetry: TelemetrySheet? = null
+
+    /** The web card derives these from the counters, and does it whether or not it is on screen. */
+    private val linkRate = LinkRate()
+    private val dropWindow = DropWindow()
 
     private var link: UsbSerialLink? = null
     private var sim: SimFeed? = null
@@ -125,14 +133,16 @@ class Widscan58Activity : Activity() {
             contentDescription = getString(R.string.settings_title)
             setOnClickListener { openSetup() }
         }
-        historyChip = chip(getString(R.string.chip_history)).apply {
-            contentDescription = getString(R.string.history_title)
-            setOnClickListener { openHistory() }
+        // The row is full at six bands plus the live controls, so the whole-screen
+        // views — history, telemetry, and the ones after them — come from a menu.
+        moreChip = chip(getString(R.string.chip_more)).apply {
+            contentDescription = getString(R.string.more_views)
+            setOnClickListener { openMore() }
         }
         bandRow.addView(maxChip)
         bandRow.addView(avgChip)
         bandRow.addView(setupButton)
-        bandRow.addView(historyChip)
+        bandRow.addView(moreChip)
         sheet = SettingsSheet(this, prefs, ::applySetting, ::refresh, ::planNames, ::applyPlan)
 
         // A tile is a button: it opens the channel's own chart. The panorama stays a scrubber.
@@ -190,6 +200,7 @@ class Widscan58Activity : Activity() {
         sheet?.dismiss()
         zoom?.dismiss()
         history?.dismiss()
+        telemetry?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
         sim?.stop()
@@ -209,6 +220,7 @@ class Widscan58Activity : Activity() {
     }
 
     private fun refresh() {
+        sampleLink()
         panorama.selected = selected
         panorama.dbMin = prefs.dbMin.toDouble()
         panorama.dbMax = prefs.dbMax.toDouble()
@@ -242,6 +254,7 @@ class Widscan58Activity : Activity() {
         sheet?.update(store.status)
         zoom?.update()
         history?.update()
+        telemetry?.update(linkCounters())
         statusLine.text = status()
     }
 
@@ -323,6 +336,46 @@ class Widscan58Activity : Activity() {
     private fun openHistory() {
         history?.dismiss()
         history = HistorySheet(this, prefs, store).also { it.show(selected) }
+    }
+
+    private fun openMore() {
+        val menu = PopupMenu(this, moreChip)
+        menu.menu.add(0, MENU_HISTORY, 0, R.string.history_title)
+        menu.menu.add(0, MENU_TELEMETRY, 0, R.string.telemetry_title)
+        menu.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                MENU_HISTORY -> openHistory()
+                MENU_TELEMETRY -> openTelemetry()
+                else -> return@setOnMenuItemClickListener false
+            }
+            true
+        }
+        menu.show()
+    }
+
+    /** The numbers the board reports about itself, which the instrument layout has no room for. */
+    private fun openTelemetry() {
+        telemetry?.dismiss()
+        telemetry = TelemetrySheet(this, store).also { it.show() }
+    }
+
+    /** KiB/s and dropped frames are rates off counters, so they need sampling between the panels. */
+    private fun sampleLink() {
+        val now = store.now()
+        parser?.let { linkRate.sample(now, it.bytes) }
+        store.telemetry?.let { dropWindow.add(now, it.drops) }
+    }
+
+    private fun linkCounters(): LinkCounters {
+        val p = parser ?: return LinkCounters.STANDBY
+        return LinkCounters(
+            live = true,
+            bytes = p.bytes,
+            bytesPerSecond = linkRate.perSecond,
+            crcErrors = p.crcErrors,
+            resyncBytes = p.resyncBytes,
+            recentDrops = dropWindow.recent(store.telemetry?.drops ?: 0),
+        )
     }
 
     /** One write, then the reply that lets the form show the device's state instead of our request. */
@@ -460,6 +513,8 @@ class Widscan58Activity : Activity() {
         private const val FRAME_MS = 33L
         private const val WATCHDOG_PERIOD_MS = 1000L
         private const val NO_DATA_MS = 3000L
+        private const val MENU_HISTORY = 1
+        private const val MENU_TELEMETRY = 2
         private val TILE_IDS = intArrayOf(
             R.id.tile0, R.id.tile1, R.id.tile2, R.id.tile3, R.id.tile4, R.id.tile5, R.id.tile6, R.id.tile7,
         )
