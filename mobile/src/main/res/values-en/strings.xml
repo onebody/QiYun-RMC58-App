@@ -131,6 +131,7 @@
 
     <string name="chip_more">⋯</string>
     <string name="more_views">More views</string>
+    <string name="auto_scale">Auto scale</string>
     <string name="telemetry_title">Scanner telemetry</string>
     <string name="stat_rotation">Rotation rate</string>
     <string name="stat_hop">Hop time</string>

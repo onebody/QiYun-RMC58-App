@@ -350,7 +350,7 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
     private val longPress = Runnable {
         if (isPlotHit(downX, downY)) {
             longFired = true
-            fitRange()?.let { (lo, hi) -> onFit(lo, hi) }
+            autoScale()
         }
     }
 
@@ -397,6 +397,11 @@ class PanoramaView @JvmOverloads constructor(context: Context, attrs: AttributeS
         selected = best
         onPick(best)
         invalidate()
+    }
+
+    /** The web UI's Auto scale button, for the menu: the long press is the same action. */
+    fun autoScale() {
+        fitRange()?.let { (lo, hi) -> onFit(lo, hi) }
     }
 
     /** The web UI's Auto scale: five dB of padding, rounded to the next 5 dB. */

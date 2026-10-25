@@ -340,10 +340,12 @@ class Widscan58Activity : Activity() {
 
     private fun openMore() {
         val menu = PopupMenu(this, moreChip)
+        menu.menu.add(0, MENU_SCALE, 0, R.string.auto_scale)
         menu.menu.add(0, MENU_HISTORY, 0, R.string.history_title)
         menu.menu.add(0, MENU_TELEMETRY, 0, R.string.telemetry_title)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                MENU_SCALE -> panorama.autoScale()
                 MENU_HISTORY -> openHistory()
                 MENU_TELEMETRY -> openTelemetry()
                 else -> return@setOnMenuItemClickListener false
@@ -513,8 +515,9 @@ class Widscan58Activity : Activity() {
         private const val FRAME_MS = 33L
         private const val WATCHDOG_PERIOD_MS = 1000L
         private const val NO_DATA_MS = 3000L
-        private const val MENU_HISTORY = 1
-        private const val MENU_TELEMETRY = 2
+        private const val MENU_SCALE = 1
+        private const val MENU_HISTORY = 2
+        private const val MENU_TELEMETRY = 3
         private val TILE_IDS = intArrayOf(
             R.id.tile0, R.id.tile1, R.id.tile2, R.id.tile3, R.id.tile4, R.id.tile5, R.id.tile6, R.id.tile7,
         )
