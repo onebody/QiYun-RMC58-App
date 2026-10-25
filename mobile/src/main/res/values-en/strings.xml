@@ -37,4 +37,67 @@
     <string name="note_no_data">no data: re-arming monitor mode</string>
     <string name="note_open_failed">open failed: %1$s</string>
     <string name="note_no_cdc">%1$s is not a CDC port</string>
+
+    <string name="chip_settings">Setup</string>
+    <string name="settings_title">Scanner setup</string>
+    <string name="close">Close</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="reboot">Reboot</string>
+    <string name="reboot_confirm">Reboot the device?</string>
+    <string name="bootloader">Bootloader</string>
+    <string name="bootloader_confirm">Reboot into the ROM download mode? The scanner stops until the device is reflashed or reset.</string>
+    <string name="recal_now">Recalibrate now</string>
+
+    <string name="set_plan">Channel plan</string>
+    <string name="set_plan_edit">Edit</string>
+    <string name="set_channels">Channels measured</string>
+    <string name="set_all">All</string>
+    <string name="set_none">None</string>
+
+    <string name="plan_title">Channels to scan</string>
+    <string name="plan_hint">Up to 8 channels. Tap a band name to take all eight of its channels.</string>
+    <string name="plan_count">%1$d of %2$d selected · %3$s</string>
+    <string name="plan_clear">Clear</string>
+
+    <string name="set_mode">LO plan</string>
+    <string name="set_mode_group">Group</string>
+    <string name="set_mode_single">Single</string>
+    <string name="set_gain_mode">Gain mode</string>
+    <string name="set_manual">Manual</string>
+    <string name="set_agc">AGC</string>
+    <string name="set_gain_value">RX gain (PHY table index, not dB)</string>
+    <string name="set_filter">Analog filter code (-1 = auto)</string>
+    <string name="set_auto">Auto</string>
+    <string name="set_fft">FFT points</string>
+    <string name="set_capture">Capture samples</string>
+    <string name="set_segments">Welch segments</string>
+    <string name="set_metrics">Per-channel metrics</string>
+    <string name="set_windows">Windows ± kHz</string>
+    <string name="set_window_rssi">RSSI ±kHz</string>
+    <string name="set_window_search">Search ±kHz</string>
+    <string name="set_ema">Smoothing α</string>
+    <string name="set_ema_rssi">RSSI α</string>
+    <string name="set_ema_clear">Clear α</string>
+    <string name="set_spectrum">Display spectrum (every N hops · bins · ± kHz)</string>
+    <string name="set_spec_every">every N</string>
+    <string name="set_spec_bins">bins</string>
+    <string name="set_spec_span">span kHz</string>
+    <string name="set_spec_detector">Detector</string>
+    <string name="set_detector_max">Max</string>
+    <string name="set_detector_mean">Mean</string>
+    <string name="set_recal_mode">Recalibration</string>
+    <string name="set_settle">Settle after tune, µs</string>
+    <string name="set_tune_skip">Tune skip bits (debug)</string>
+    <string name="set_skip_pll">PLL only</string>
+    <string name="set_skip_rx">Skip RX path</string>
+    <string name="set_skip_gain">Skip gain</string>
+    <string name="set_conjugate">Spectrum orientation</string>
+    <string name="set_on">On</string>
+    <string name="set_off">Off</string>
+    <string name="set_iq_corr">IQ correction</string>
+    <string name="set_display_db">Display dB range (UI only)</string>
+    <string name="set_db_min">min</string>
+    <string name="set_db_max">max</string>
+    <string name="set_device">Device</string>
 </resources>

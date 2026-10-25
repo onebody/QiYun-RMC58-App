@@ -2,8 +2,9 @@
 // hardware: `adb shell am start -n com.onebody.widscan58/.Widscan58Activity --ez sim true`.
 // It writes the same SPECTRUM / METRICS / TELEMETRY payloads the firmware does
 // (firmware/src/proto/frames.h) for a band of VTXs plus the board spurs and a
-// wide interference bump. Only that intent extra starts it, and it never touches
-// the USB stack. Mirrors web/src/mock/mockDevice.ts. GPL-3.0-or-later.
+// wide interference bump, and answers the sweep commands the settings sheet
+// sends. Only that intent extra starts it, and it never touches the USB stack.
+// Mirrors web/src/mock/mockDevice.ts. GPL-3.0-or-later.
 package com.onebody.widscan58
 
 import android.os.Handler
@@ -43,6 +44,7 @@ class SimFeed(
     private val onChanged: () -> Unit,
 ) {
     private val rnd = Random(20261025)
+    private val cfg = Cfg()
     private var plan = planOf(Bands.names("R"))
     private var hop = 0
     private var ticks = 0
@@ -50,8 +52,7 @@ class SimFeed(
 
     var running = true
         private set
-    var gain = 45
-        private set
+    val gain: Int get() = cfg.gain
 
     private val step = object : Runnable {
         override fun run() {
@@ -75,37 +76,89 @@ class SimFeed(
 
     /** The instrument's own commands, answered the way the board would. */
     fun onCommand(line: String) {
-        when {
-            line == "SCAN START" -> running = true
-            line == "SCAN STOP" -> running = false
-            line.startsWith("GAIN MANUAL") -> gain = line.substringAfterLast(' ').toIntOrNull() ?: gain
-            line.startsWith("CHANNELS") -> {
-                val names = Bands.normalize(line.split(' ').drop(1).map { it.substringBefore('=') })
+        val p = line.split(' ')
+        val verb = p.firstOrNull()
+        val word = p.getOrNull(1)
+        var republish = true
+        when (verb) {
+            "SCAN" -> running = word == "START"
+            "MODE" -> if (word == "GROUP" || word == "SINGLE") cfg.mode = word else republish = false
+            "GAIN" -> when (word) {
+                "HARDWARE" -> cfg.gainMode = "HARDWARE"
+                "MANUAL" -> {
+                    cfg.gainMode = "MANUAL"
+                    cfg.gain = (p.getOrNull(2)?.toIntOrNull() ?: cfg.gain).coerceIn(0, cfg.gainMax)
+                }
+                else -> republish = false
+            }
+            "FILTER" -> cfg.filter =
+                if (word == "AUTO") -1 else (word?.toIntOrNull() ?: cfg.filter).coerceIn(0, FILTER_MAX)
+            "FFT" -> word?.toIntOrNull()?.let { cfg.nfft = it.coerceIn(64, 2048) }
+            "CAPN" -> word?.toIntOrNull()?.let { cfg.captureSamples = it.coerceAtLeast(cfg.nfft) }
+            "SEGMENTS" -> word?.toIntOrNull()?.let { cfg.segments = it.coerceIn(1, 64) }
+            "METRICS" -> MetricsMode.entries.firstOrNull { it.name == word }?.let { cfg.metrics = it }
+            "WIN" -> {
+                cfg.rssiHz = window(word?.toLong())
+                cfg.searchHz = window(p.getOrNull(2)?.toLong())
+            }
+            "EMA" -> {
+                cfg.ema = alpha(word?.toIntOrNull())
+                cfg.clearEma = alpha(p.getOrNull(2)?.toIntOrNull())
+            }
+            "SPEC" -> if (p.size >= 5) {
+                cfg.specEvery = (p[1].toIntOrNull() ?: cfg.specEvery).coerceIn(0, 255)
+                cfg.specBins = (p[2].toIntOrNull() ?: cfg.specBins).coerceIn(16, 1024)
+                cfg.specSpanHz = (p[3].toLongOrNull() ?: cfg.specSpanHz).coerceIn(100_000, 40_000_000)
+                cfg.specDetector = if (p[4] == "MAX") 1 else 0
+            }
+            "SETTLE" -> word?.toIntOrNull()?.let { cfg.settleUs = it.coerceIn(0, 20_000) }
+            "RECALMODE" -> when (word) {
+                "CACHE", "ONCE", "EVERY" -> cfg.recal = word
+                else -> republish = false
+            }
+            "TUNESKIP" -> word?.toIntOrNull()?.let { cfg.tskip = it and 7 }
+            "CONJ" -> cfg.conjugate = if (word == "1") 1 else 0
+            "IQCORR" -> cfg.iqCorr = if (word == "1") 1 else 0
+            "ENABLE" -> word?.toIntOrNull()?.let { cfg.enabled = it and 0xff }
+            "CHANNELS" -> {
+                val names = Bands.normalize(p.drop(1).map { it.substringBefore('=') })
                 if (names.isNotEmpty()) {
                     plan = planOf(names)
                     hop = 0
-                    publish()
+                    // parse_channels() switches the whole new plan on.
+                    cfg.enabled = (1 shl names.size) - 1
                 }
             }
+            else -> republish = false
         }
+        if (republish) publish()
     }
 
     // ---- what the radio sees ----
 
+    /** The channels the plan measures: the enabled mask, or the first one if all are off. */
+    private fun hops(): List<ProfileChannel> = plan.filter { cfg.enabled and (1 shl it.id) != 0 }
+        .ifEmpty { plan.take(1) }
+
     private fun emitHop() {
-        val ch = plan[hop % plan.size]
-        store.ingest(StreamItem.Frame(FrameType.SPECTRUM, spectrumAt(ch)))
-        store.ingest(StreamItem.Frame(FrameType.METRICS, metricsAt(ch)))
+        val hops = hops()
+        val ch = hops[hop % hops.size]
+        if (cfg.specEvery == 0 || hop % cfg.specEvery == 0) {
+            store.ingest(StreamItem.Frame(FrameType.SPECTRUM, spectrumAt(ch)))
+        }
+        store.ingest(StreamItem.Frame(FrameType.METRICS, metricsAt(ch, hops)))
         hop++
-        if (hop % plan.size == 0) rotations++
+        if (hop % hops.size == 0) rotations++
     }
 
-    /** One 40 MHz segment centred on the hop's LO: noise, this channel's VTX, and the fixtures. */
+    /** One segment centred on the hop's LO, as wide as the display spectrum asks for. */
     private fun spectrumAt(ch: ProfileChannel): ByteArray {
-        val codes = IntArray(BINS)
+        val bins = cfg.specBins
+        val binHz = 2 * cfg.specSpanHz / bins
+        val codes = IntArray(bins)
         val base = FLOOR_DB + rnd.nextDouble(-1.0, 1.0)
-        for (j in 0 until BINS) {
-            val hz = ch.khz * 1000.0 + (j - BINS / 2) * BIN_HZ
+        for (j in 0 until bins) {
+            val hz = ch.khz * 1000.0 + (j - bins / 2) * binHz
             var db = base + rnd.nextDouble(0.0, 2.5)
             db += lobe(hz, ch.khz * 1000.0, 1.1, signalAboveFloor(ch))
             db += lobe(hz, INTERFERENCE_HZ, 8.0, 9.0)
@@ -113,7 +166,7 @@ class SimFeed(
             db += lobe(hz, SPUR_B_HZ, 0.5, 17.0)
             codes[j] = specCode(db)
         }
-        return spectrumPayload(ch.khz, codes)
+        return spectrumPayload(ch.khz, binHz, codes)
     }
 
     /** A Gaussian rise of [peakDb] above the floor, [widthMHz] wide, centred on [centreHz]. */
@@ -128,8 +181,8 @@ class SimFeed(
         return if (level <= FLOOR_DB + 2) 0.0 else (level - FLOOR_DB) + rnd.nextDouble(-1.0, 1.0)
     }
 
-    private fun metricsAt(ch: ProfileChannel): ByteArray {
-        val records = plan.map { c ->
+    private fun metricsAt(ch: ProfileChannel, hops: List<ProfileChannel>): ByteArray {
+        val records = hops.map { c ->
             val rssi = (VTX_DB.getOrElse(c.id) { FLOOR_DB }) + rnd.nextDouble(-0.8, 0.8)
             val flags = VTX_FLAGS.getOrElse(c.id) { 0 }
             val occupied = flags and ChannelFlag.SIGNAL != 0
@@ -143,29 +196,32 @@ class SimFeed(
                 obwHz = if (occupied) -4_500_000L..4_500_000L else null,
             )
         }
-        return metricsPayload(ch.khz, gain, records)
+        return metricsPayload(ch.khz, hop % hops.size, hops.size, cfg.gain, records)
     }
 
     private fun emitTelemetry() {
-        store.ingest(StreamItem.Frame(FrameType.TELEMETRY, telemetryPayload(rotations, running, plan.size)))
+        val hops = hops()
+        store.ingest(StreamItem.Frame(FrameType.TELEMETRY, telemetryPayload(rotations, running, hops.size)))
     }
 
-    /** Tell the engine which band it is scanning, exactly as PROFILE? and STATUS? would. */
+    /** Tell the engine which band it is scanning and how, exactly as PROFILE? and STATUS? would. */
     private fun publish() {
+        val hops = hops()
+        val first = plan.first()
         store.setProfile(
             Profile(
-                name = "sim-${plan.first().name.take(1)}",
+                name = "sim-${first.name.take(1)}",
                 description = "Raceband R1-R8 [SIMULATED]",
                 target = "esp32-c5",
                 bandKhz = longArrayOf(plan.minOf { it.khz } - 40_000, plan.maxOf { it.khz } + 40_000),
-                baseKhz = plan.first().khz,
-                equivBaseKhz = plan.first().khz,
+                baseKhz = first.khz,
+                equivBaseKhz = first.khz,
                 scale = 1.0,
                 rateHz = 80_000_000,
                 usableHz = 40_000_000,
                 passbandHz = 18_000_000,
-                rssiHz = 5_000_000,
-                searchHz = 12_000_000,
+                rssiHz = cfg.rssiHz,
+                searchHz = cfg.searchHz,
                 channels = plan,
             ),
         )
@@ -173,35 +229,35 @@ class SimFeed(
             Status(
                 profile = "sim",
                 running = if (running) 1 else 0,
-                enabled = 0xff,
-                mode = "GROUP",
-                captureSamples = 128,
-                nfft = 128,
-                segments = 8,
+                enabled = cfg.enabled,
+                mode = cfg.mode,
+                captureSamples = cfg.captureSamples,
+                nfft = cfg.nfft,
+                segments = cfg.segments,
                 rateCode = 1,
-                filter = 0,
-                conjugate = 0,
-                iqCorr = 0,
-                settleUs = 40,
-                tskip = null,
-                gainMode = "MANUAL",
-                gain = gain,
-                gainMax = 63,
+                filter = cfg.filter,
+                conjugate = cfg.conjugate,
+                iqCorr = cfg.iqCorr,
+                settleUs = cfg.settleUs,
+                tskip = cfg.tskip,
+                gainMode = cfg.gainMode,
+                gain = cfg.gain,
+                gainMax = cfg.gainMax,
                 rawiqMax = null,
-                recal = "boot",
-                metrics = MetricsMode.FULL,
-                rssiHz = 5_000_000,
-                searchHz = 12_000_000,
+                recal = cfg.recal,
+                metrics = cfg.metrics,
+                rssiHz = cfg.rssiHz,
+                searchHz = cfg.searchHz,
                 dcGuard = 3,
-                ema = 8,
-                clearEma = 0,
-                signalDb = -75.0,
+                ema = cfg.ema,
+                clearEma = cfg.clearEma,
+                signalDb = 6.0,
                 avgShift = 1,
-                specEvery = 4,
-                specBins = BINS,
-                specSpanHz = BINS.toLong() * BIN_HZ,
-                specDetector = 0,
-                plan = plan.map { PlanHop(it.khz, intArrayOf(it.id), longArrayOf(0)) },
+                specEvery = cfg.specEvery,
+                specBins = cfg.specBins,
+                specSpanHz = cfg.specSpanHz,
+                specDetector = cfg.specDetector,
+                plan = hops.map { PlanHop(it.khz, intArrayOf(it.id), longArrayOf(0)) },
             ),
         )
     }
@@ -216,31 +272,68 @@ class SimFeed(
         val obwHz: LongRange?,
     )
 
+    /** The settings the board would hold, with the firmware's own defaults. */
+    private class Cfg {
+        /* The boot state of a real board: scanner_defaults() with the c5-race profile. */
+        var mode = "GROUP"
+        var gainMode = "MANUAL"
+        var gain = 45
+        var gainMax = 82
+        var filter = 0
+        var nfft = 1024
+        var captureSamples = 4096
+        var segments = 4
+        var metrics = MetricsMode.FULL
+        var rssiHz = 5_000_000L
+        var searchHz = 12_000_000L
+        var ema = 0.25
+        var clearEma = 0.02
+        var specEvery = 4
+        var specBins = 256
+        var specSpanHz = 40_000_000L // one-sided, as the firmware stores it
+        var specDetector = 1
+        var settleUs = 100
+        var recal = "CACHE"
+        var tskip = 3
+        var conjugate = 1
+        var iqCorr = 1
+        var enabled = 0xff
+    }
+
     companion object {
-        private const val BINS = 256
-        private const val BIN_HZ = 156_250
         private const val FLOOR_DB = -96.0
         private const val INTERFERENCE_HZ = 5790e6
         private const val SPUR_A_HZ = 5680e6 // the board spurs listed in PLAN.md
         private const val SPUR_B_HZ = 5840e6
         private const val HOP_MS = 130L
         private const val TELEMETRY_EVERY = 4
+        private const val FILTER_MAX = 63
+
+        private fun window(hz: Long?) = (hz ?: 5_000_000L).coerceIn(10_000, 20_000_000)
+
+        private fun alpha(milli: Int?) = (milli ?: 250) / 1000.0
 
         private fun planOf(names: List<String>): List<ProfileChannel> =
             names.take(MAX_CHANNELS).mapIndexed { i, name -> ProfileChannel(i, name, Bands.mhz(name)!! * 1000L) }
 
         private fun specCode(db: Double): Int = ((db + 127.5) * 2).roundToInt().coerceIn(0, 255)
 
-        private fun spectrumPayload(loKhz: Long, codes: IntArray): ByteArray {
+        private fun spectrumPayload(loKhz: Long, binHz: Long, codes: IntArray): ByteArray {
             val p = ByteArray(20 + codes.size)
             val b = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
-            b.putInt(0, 1).putInt(4, loKhz.toInt()).putInt(8, -BINS / 2 * BIN_HZ).putInt(12, BIN_HZ)
+            b.putInt(0, 1).putInt(4, loKhz.toInt()).putInt(8, -codes.size / 2 * binHz.toInt()).putInt(12, binHz.toInt())
                 .putShort(16, codes.size.toShort())
             codes.forEachIndexed { i, c -> p[20 + i] = c.toByte() }
             return p
         }
 
-        private fun metricsPayload(loKhz: Long, gain: Int, channels: List<MetricRecord>): ByteArray {
+        private fun metricsPayload(
+            loKhz: Long,
+            hopIndex: Int,
+            hops: Int,
+            gain: Int,
+            channels: List<MetricRecord>,
+        ): ByteArray {
             val p = ByteArray(34 + 26 * channels.size)
             val b = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
             b.putInt(0, 3).putInt(4, 100).putInt(8, loKhz.toInt())
@@ -248,8 +341,8 @@ class SimFeed(
                 .putShort(24, 1).putShort(26, (FLOOR_DB * 100).roundToInt().toShort())
                 .putShort(28, (-8400).toShort())
             p[30] = gain.toByte()
-            p[31] = 0
-            p[32] = 1
+            p[31] = hopIndex.toByte()
+            p[32] = hops.toByte()
             p[33] = channels.size.toByte()
             fun i16(at: Int, db: Double) = b.putShort(at, (db * 100).roundToInt().toShort())
             channels.forEachIndexed { i, c ->

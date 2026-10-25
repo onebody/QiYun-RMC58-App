@@ -4,6 +4,7 @@ package com.onebody.widscan58
 
 import android.content.Context
 import com.onebody.widscan58.core.Bands
+import com.onebody.widscan58.core.DeviceCommands
 import com.onebody.widscan58.core.DeviceSettings
 import com.onebody.widscan58.core.GainMode
 import com.onebody.widscan58.core.LoPlan
@@ -14,22 +15,37 @@ class Prefs(context: Context) {
     /** The board is put in this state on every connect. */
     fun deviceSettings(): DeviceSettings = DeviceSettings.of(
         channels = channels,
-        mode = LoPlan.GROUP,
-        gainMode = GainMode.MANUAL,
+        mode = loPlan,
+        gainMode = gainMode,
         gain = gain,
+        enabled = enabledMask,
     )
 
     val channels: List<String>
         get() = sp.getString("channels", "")!!.split(',').filter { it.isNotEmpty() }.ifEmpty { Bands.names("R") }
 
-    /** One-tap band selection: all eight channels of the band. */
-    fun setBand(letter: String) = setChannels(Bands.names(letter))
-
+    /** Store a plan the device can tune; the band chips and the editor both write here. */
     fun setChannels(names: List<String>) = put("channels", Bands.normalize(names).joinToString(","))
+
+    /** Which channel ids of the plan the device measures, as an 8-bit mask. */
+    var enabledMask: Int
+        get() = sp.getInt("enabled", 0xff) and 0xff
+        set(value) = sp.edit().putInt("enabled", value and 0xff).apply()
+
+    var loPlan: LoPlan
+        get() = LoPlan.entries.firstOrNull { it.name == sp.getString("loPlan", LoPlan.GROUP.name) } ?: LoPlan.GROUP
+        set(value) = sp.edit().putString("loPlan", value.name).apply()
+
+    var gainMode: GainMode
+        get() = GainMode.entries.firstOrNull { it.name == sp.getString("gainMode", GainMode.MANUAL.name) }
+            ?: GainMode.MANUAL
+        set(value) = sp.edit().putString("gainMode", value.name).apply()
 
     val gain: Int get() = sp.getInt("gain", 45)
 
-    fun setGain(gain: Int) = sp.edit().putInt("gain", gain.coerceIn(0, GAIN_MAX)).apply()
+    /** The ceiling is the device's own when it reports one; manual gain never leaves it. */
+    fun setGain(gain: Int, max: Int = GAIN_MAX) =
+        sp.edit().putInt("gain", gain.coerceIn(0, max.coerceAtLeast(0))).apply()
 
     var dbMin: Int
         get() = sp.getInt("dbMin", -85)
@@ -47,7 +63,7 @@ class Prefs(context: Context) {
     private fun put(key: String, value: String) = sp.edit().putString(key, value).apply()
 
     companion object {
-        /** The firmware's manual gain range. */
-        const val GAIN_MAX = 63
+        /** The ceiling used until the board reports its own `gain_max`. */
+        const val GAIN_MAX = DeviceCommands.GAIN_FALLBACK_MAX
     }
 }

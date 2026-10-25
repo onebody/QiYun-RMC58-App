@@ -39,4 +39,67 @@
     <string name="note_no_data">无数据，重新进入监听模式</string>
     <string name="note_open_failed">打开失败：%1$s</string>
     <string name="note_no_cdc">%1$s 不是 CDC 串口</string>
+
+    <string name="chip_settings">参数</string>
+    <string name="settings_title">扫描参数</string>
+    <string name="close">关闭</string>
+    <string name="yes">确定</string>
+    <string name="no">取消</string>
+    <string name="reboot">重启设备</string>
+    <string name="reboot_confirm">重启设备？</string>
+    <string name="bootloader">烧录模式</string>
+    <string name="bootloader_confirm">重启进入 ROM 下载模式？扫描会停止，直到重新烧录或复位。</string>
+    <string name="recal_now">立即校准</string>
+
+    <string name="set_plan">频道计划</string>
+    <string name="set_plan_edit">编辑</string>
+    <string name="set_channels">扫描频道</string>
+    <string name="set_all">全选</string>
+    <string name="set_none">全不选</string>
+
+    <string name="plan_title">选择扫描频道</string>
+    <string name="plan_hint">最多 8 个频道；点波段名可一次选中该波段全部 8 个。</string>
+    <string name="plan_count">已选 %1$d/%2$d · %3$s</string>
+    <string name="plan_clear">清空</string>
+
+    <string name="set_mode">LO 模式</string>
+    <string name="set_mode_group">分组</string>
+    <string name="set_mode_single">单频点</string>
+    <string name="set_gain_mode">增益模式</string>
+    <string name="set_manual">手动</string>
+    <string name="set_agc">硬件 AGC</string>
+    <string name="set_gain_value">RX 增益（PHY 表序号，非 dB）</string>
+    <string name="set_filter">模拟滤波码（-1 为自动）</string>
+    <string name="set_auto">自动</string>
+    <string name="set_fft">FFT 点数</string>
+    <string name="set_capture">采样点数</string>
+    <string name="set_segments">平均段数</string>
+    <string name="set_metrics">通道测量项</string>
+    <string name="set_windows">窗口 ± kHz</string>
+    <string name="set_window_rssi">RSSI ±kHz</string>
+    <string name="set_window_search">搜索 ±kHz</string>
+    <string name="set_ema">平滑系数 α</string>
+    <string name="set_ema_rssi">RSSI α</string>
+    <string name="set_ema_clear">底噪 α</string>
+    <string name="set_spectrum">显示频谱（每 N 跳 · 格数 · ± kHz）</string>
+    <string name="set_spec_every">每N跳</string>
+    <string name="set_spec_bins">格数</string>
+    <string name="set_spec_span">跨度kHz</string>
+    <string name="set_spec_detector">检波方式</string>
+    <string name="set_detector_max">峰值</string>
+    <string name="set_detector_mean">均值</string>
+    <string name="set_recal_mode">校准模式</string>
+    <string name="set_settle">调谐后稳定 µs</string>
+    <string name="set_tune_skip">跳过调谐（调试）</string>
+    <string name="set_skip_pll">仅 PLL</string>
+    <string name="set_skip_rx">关 RX 通道</string>
+    <string name="set_skip_gain">跳过增益</string>
+    <string name="set_conjugate">频谱方向</string>
+    <string name="set_on">开</string>
+    <string name="set_off">关</string>
+    <string name="set_iq_corr">IQ 校正</string>
+    <string name="set_display_db">显示 dB 范围</string>
+    <string name="set_db_min">下限</string>
+    <string name="set_db_max">上限</string>
+    <string name="set_device">设备</string>
 </resources>

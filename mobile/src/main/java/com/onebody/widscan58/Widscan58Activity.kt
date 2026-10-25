@@ -20,6 +20,8 @@ import com.onebody.widscan58.core.Bands
 import com.onebody.widscan58.core.Cancellable
 import com.onebody.widscan58.core.CommandResult
 import com.onebody.widscan58.core.CommandRunner
+import com.onebody.widscan58.core.DeviceCommands
+import com.onebody.widscan58.core.GainMode
 import com.onebody.widscan58.core.Scheduler
 import com.onebody.widscan58.core.StreamItem
 import com.onebody.widscan58.core.StreamParser
@@ -59,10 +61,12 @@ class Widscan58Activity : Activity() {
     private lateinit var statusLine: TextView
     private lateinit var scanButton: Button
     private lateinit var holdsButton: Button
+    private lateinit var setupButton: Button
     private lateinit var gainBar: SeekBar
     private lateinit var gainValue: TextView
     private lateinit var maxChip: Button
     private lateinit var avgChip: Button
+    private var sheet: SettingsSheet? = null
 
     private var link: UsbSerialLink? = null
     private var sim: SimFeed? = null
@@ -114,8 +118,14 @@ class Widscan58Activity : Activity() {
         avgChip = chip(getString(R.string.chip_avg)).apply {
             setOnClickListener { prefs.showAverage = !prefs.showAverage; refresh() }
         }
+        setupButton = chip(getString(R.string.chip_settings)).apply {
+            contentDescription = getString(R.string.settings_title)
+            setOnClickListener { openSetup() }
+        }
         bandRow.addView(maxChip)
         bandRow.addView(avgChip)
+        bandRow.addView(setupButton)
+        sheet = SettingsSheet(this, prefs, ::applySetting, ::refresh, ::planNames, ::applyPlan)
 
         tiles.forEach { it.onPick = { id -> selected = id; refresh() } }
         scanButton.setOnClickListener { toggleScan() }
@@ -146,6 +156,8 @@ class Widscan58Activity : Activity() {
         showSim = intent.getBooleanExtra("sim", false)
         if (showSim) {
             sim = SimFeed(store, main, ::refresh).also { it.start() }
+            // The same restore a board gets, so the sim comes up in the stored state.
+            handshake()
         }
     }
 
@@ -166,6 +178,7 @@ class Widscan58Activity : Activity() {
 
     override fun onPause() {
         super.onPause()
+        sheet?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
         sim?.stop()
@@ -198,6 +211,8 @@ class Widscan58Activity : Activity() {
         if (planned) tiles.forEachIndexed { id, view -> view.bind(channelTile(store, id, selected), now) }
 
         val deviceGain = store.status?.gain
+        // The manual-gain ceiling is the PHY table depth the board reports, not our guess.
+        store.status?.gainMax?.takeIf { it > 0 }?.let { if (gainBar.max != it) gainBar.max = it }
         if (!draggingGain) {
             gainBar.progress = deviceGain ?: prefs.gain
             gainValue.text = gainBar.progress.toString()
@@ -212,6 +227,8 @@ class Widscan58Activity : Activity() {
         scanButton.setText(if (live && running) R.string.scan_stop else R.string.scan_start)
         scanButton.isEnabled = live
         gainBar.isEnabled = live
+        setupButton.isEnabled = live
+        sheet?.update(store.status)
         statusLine.text = status()
     }
 
@@ -235,26 +252,54 @@ class Widscan58Activity : Activity() {
     }
 
     /** The band the device's current plan belongs to, for the chip highlight. */
-    private fun currentBand(): String? {
-        val names = store.profile?.channels?.map { it.name }.orEmpty().ifEmpty { prefs.channels }
-        return names.firstOrNull()?.take(1)?.let { letter -> Bands.ALL.find { it.letter == letter }?.letter }
-    }
+    private fun currentBand(): String? =
+        planNames().firstOrNull()?.take(1)?.let { letter -> Bands.ALL.find { it.letter == letter }?.letter }
 
     // ---- controls ----
 
-    private fun selectBand(letter: String) {
-        prefs.setBand(letter)
+    /** The plan the board dials now, falling back to what we would send it. */
+    private fun planNames(): List<String> =
+        store.profile?.channels?.map { it.name }.orEmpty().ifEmpty { prefs.channels }
+
+    /**
+     * A new plan is measured whole: CHANNELS switches every channel of the plan it
+     * builds back on, and the old mask picked channels by position in the old plan.
+     */
+    private fun applyPlan(names: List<String>) {
+        prefs.setChannels(names)
+        prefs.enabledMask = (1 shl prefs.channels.size) - 1
         note = ""
-        command(Bands.channelsCommand(prefs.deviceSettings().channels))
+        val settings = prefs.deviceSettings()
+        command(Bands.channelsCommand(settings.channels))
+        command(DeviceCommands.enable(settings.enabledFor()))
         command("PROFILE?")
         command("STATUS?")
         refresh()
     }
 
+    private fun selectBand(letter: String) = applyPlan(Bands.names(letter))
+
     private fun applyGain(value: Int) {
-        prefs.setGain(value)
-        command("GAIN MANUAL $value")
+        prefs.setGain(value, gainBar.max)
+        command(DeviceCommands.gain(GainMode.MANUAL, value, gainBar.max))
         command("STATUS?")
+        refresh()
+    }
+
+    /** The sweep parameters only mean something against a board that can answer for them. */
+    private fun openSetup() {
+        if (link == null && sim == null) {
+            note = getString(R.string.plug_in)
+            refresh()
+            return
+        }
+        sheet?.show(store.status)
+    }
+
+    /** One write, then the reply that lets the form show the device's state instead of our request. */
+    private fun applySetting(line: String) {
+        command(line)
+        if (line != DeviceCommands.REBOOT && line != DeviceCommands.BOOTLOADER) command("STATUS?")
         refresh()
     }
 
