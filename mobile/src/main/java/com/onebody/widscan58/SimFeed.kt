@@ -11,6 +11,7 @@ import android.os.Handler
 import com.onebody.widscan58.core.Bands
 import com.onebody.widscan58.core.ChannelFlag
 import com.onebody.widscan58.core.FrameType
+import com.onebody.widscan58.core.Hop
 import com.onebody.widscan58.core.MAX_CHANNELS
 import com.onebody.widscan58.core.MetricsMode
 import com.onebody.widscan58.core.PlanHop
@@ -214,10 +215,25 @@ class SimFeed(
         if (cfg.specEvery == 0 || hop % cfg.specEvery == 0) {
             sink(encodeFrame(FrameType.SPECTRUM, spectrumAt(ch)))
         }
-        sink(encodeFrame(FrameType.METRICS, metricsAt(ch, hops)))
+        // Only FULL gets METRICS frames: RSSI/SNR send the compact LEVELS frames lap
+        // timing uses, four bytes of level per channel instead of twenty-six.
+        val cost = hopCost()
+        if (cfg.metrics == MetricsMode.FULL) {
+            sink(encodeFrame(FrameType.METRICS, metricsAt(ch, hops, cost)))
+        } else {
+            sink(encodeFrame(FrameType.LEVELS, levelsAt(ch, hops, cost)))
+        }
         hop++
         if (hop % hops.size == 0) rotations++
     }
+
+    /** A hop costs a different amount each time, and once in a while the FFT waits for a
+     *  settle: a flat band would make the per-hop chart look broken. */
+    private fun hopCost(): Hop = Hop(
+        tuneUs = rnd.nextLong(450, 780),
+        captureUs = if (rnd.nextDouble() < 0.06) rnd.nextLong(1_400, 2_600) else rnd.nextLong(700, 1_150),
+        dspUs = rnd.nextLong(260, 520),
+    )
 
     /** One segment centred on the hop's LO, as wide as the display spectrum asks for. */
     private fun spectrumAt(ch: ProfileChannel): ByteArray {
@@ -249,7 +265,7 @@ class SimFeed(
         return if (level <= FLOOR_DB + 2) 0.0 else (level - FLOOR_DB) + rnd.nextDouble(-1.0, 1.0)
     }
 
-    private fun metricsAt(ch: ProfileChannel, hops: List<ProfileChannel>): ByteArray {
+    private fun metricsAt(ch: ProfileChannel, hops: List<ProfileChannel>, cost: Hop): ByteArray {
         val records = hops.map { c ->
             val rssi = (VTX_DB.getOrElse(c.id) { FLOOR_DB }) + rnd.nextDouble(-0.8, 0.8)
             val flags = VTX_FLAGS.getOrElse(c.id) { 0 }
@@ -264,13 +280,30 @@ class SimFeed(
                 obwHz = if (occupied) -4_500_000L..4_500_000L else null,
             )
         }
-        return metricsPayload(
-            ch.khz, hop % hops.size, hops.size, cfg.gain, records,
-            // A hop costs a different amount each time, and once in a while the FFT waits
-            // for a settle: a flat band would make the per-hop chart look broken.
-            tuneUs = rnd.nextLong(450, 780),
-            captureUs = if (rnd.nextDouble() < 0.06) rnd.nextLong(1_400, 2_600) else rnd.nextLong(700, 1_150),
-            dspUs = rnd.nextLong(260, 520),
+        return metricsPayload(ch.khz, hop % hops.size, hops.size, cfg.gain, records, cost)
+    }
+
+    /**
+     * A LEVELS frame: the byte codes lap timing runs on, which bottom out at -63.75 dBFS.
+     * RSSI mode carries no floor, and without one the board cannot call anything a signal.
+     */
+    private fun levelsAt(ch: ProfileChannel, hops: List<ProfileChannel>, cost: Hop): ByteArray {
+        val snrMode = cfg.metrics == MetricsMode.SNR
+        val records = hops.map { c ->
+            val rssi = (VTX_DB.getOrElse(c.id) { FLOOR_DB }) + rnd.nextDouble(-0.8, 0.8)
+            var flags = VTX_FLAGS.getOrElse(c.id) { 0 }
+            if (!snrMode) flags = flags and ChannelFlag.SIGNAL.inv()
+            LevelRecord(
+                id = c.id,
+                flags = flags,
+                rssi = rssi,
+                snr = if (snrMode) (rssi - LEVEL_FLOOR_DB).coerceAtLeast(0.0) else 0.0,
+            )
+        }
+        return levelsPayload(
+            ch.khz, hop % hops.size, hops.size, cfg.gain, cfg.metrics, records, cost,
+            // The per-bin floor is a spectrum code, and the firmware leaves it out of RSSI mode.
+            floorBin = if (snrMode) specCode(LEVEL_FLOOR_DB - 24) else null,
         )
     }
 
@@ -402,6 +435,14 @@ class SimFeed(
         val obwHz: LongRange?,
     )
 
+    /** One `frame_level_t`: the levels as the board codes them, and no location at all. */
+    private class LevelRecord(
+        val id: Int,
+        val flags: Int,
+        val rssi: Double,
+        val snr: Double,
+    )
+
     /** The settings the board would hold, with the firmware's own defaults. */
     private class Cfg {
         /* The boot state of a real board: scanner_defaults() with the c5-race profile. */
@@ -432,6 +473,9 @@ class SimFeed(
 
     companion object {
         private const val FLOOR_DB = -96.0
+
+        /** The bottom of a level code's range: the quietest RSSI a LEVELS frame can carry. */
+        private const val LEVEL_FLOOR_DB = -63.75
         private const val INTERFERENCE_HZ = 5790e6
         private const val SPUR_A_HZ = 5680e6 // the board spurs listed in PLAN.md
         private const val SPUR_B_HZ = 5840e6
@@ -464,6 +508,9 @@ class SimFeed(
 
         private fun specCode(db: Double): Int = ((db + 127.5) * 2).roundToInt().coerceIn(0, 255)
 
+        /** A level code (0.25 dB): dBFS = code / 4 - 63.75, so anything quieter reads as the floor. */
+        private fun levelCode(db: Double): Int = ((db - LEVEL_FLOOR_DB) * 4).roundToInt().coerceIn(0, 255)
+
         private fun spectrumPayload(loKhz: Long, binHz: Long, codes: IntArray): ByteArray {
             val p = ByteArray(20 + codes.size)
             val b = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
@@ -479,14 +526,12 @@ class SimFeed(
             hops: Int,
             gain: Int,
             channels: List<MetricRecord>,
-            tuneUs: Long = 600,
-            captureUs: Long = 900,
-            dspUs: Long = 350,
+            cost: Hop,
         ): ByteArray {
             val p = ByteArray(34 + 26 * channels.size)
             val b = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
             b.putInt(0, 3).putInt(4, 100).putInt(8, loKhz.toInt())
-                .putInt(12, tuneUs.toInt()).putInt(16, captureUs.toInt()).putInt(20, dspUs.toInt())
+                .putInt(12, cost.tuneUs.toInt()).putInt(16, cost.captureUs.toInt()).putInt(20, cost.dspUs.toInt())
                 .putShort(24, 1).putShort(26, (FLOOR_DB * 100).roundToInt().toShort())
                 .putShort(28, (-8400).toShort())
             p[30] = gain.toByte()
@@ -508,6 +553,38 @@ class SimFeed(
                 c.obwHz?.let {
                     b.putShort(o + 22, (it.first / 1000).toShort()).putShort(o + 24, (it.last / 1000).toShort())
                 }
+            }
+            return p
+        }
+
+        /** frame_levels_t plus one frame_level_t per channel: four bytes of level, no centi-dB. */
+        private fun levelsPayload(
+            loKhz: Long,
+            hopIndex: Int,
+            hops: Int,
+            gain: Int,
+            mode: MetricsMode,
+            levels: List<LevelRecord>,
+            cost: Hop,
+            floorBin: Int?,
+        ): ByteArray {
+            val p = ByteArray(32 + 4 * levels.size)
+            val b = ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
+            b.putInt(0, 3).putInt(4, 100).putInt(8, loKhz.toInt())
+                .putInt(12, cost.tuneUs.toInt()).putInt(16, cost.captureUs.toInt()).putInt(20, cost.dspUs.toInt())
+                .putShort(24, 1)
+            p[26] = gain.toByte()
+            p[27] = hopIndex.toByte()
+            p[28] = hops.toByte()
+            p[29] = mode.ordinal.toByte()
+            p[30] = (floorBin ?: 0).toByte()
+            p[31] = levels.size.toByte()
+            levels.forEachIndexed { i, c ->
+                val o = 32 + 4 * i
+                p[o] = c.id.toByte()
+                p[o + 1] = c.flags.toByte()
+                p[o + 2] = levelCode(c.rssi).toByte()
+                p[o + 3] = (c.snr * 4).roundToInt().coerceIn(0, 255).toByte()
             }
             return p
         }
