@@ -116,4 +116,14 @@
     <string name="zoom_prev">Previous channel</string>
     <string name="zoom_next">Next channel</string>
     <string name="waiting_metrics">Waiting for metrics…</string>
+
+    <string name="chip_history">History</string>
+    <string name="history_title">RSSI history</string>
+    <string name="history_axis">dBFS/bin · seconds ago</string>
+    <string name="history_span">%1$d s</string>
+    <string name="history_ema">EMA</string>
+    <string name="history_raw">Raw</string>
+    <string name="history_clear">Clear crosshair</string>
+    <string name="history_hint">Drag across the chart to read values</string>
+    <string name="waiting_history">No sample at that time</string>
 </resources>

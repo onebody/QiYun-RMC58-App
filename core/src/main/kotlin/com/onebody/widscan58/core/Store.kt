@@ -41,7 +41,8 @@ fun smoothedSeries(cs: ChannelState): Series {
 class Store(
     private val clock: () -> Long,
     private val codec: ReplyCodec = NoReplies,
-    historySeconds: Int = 30,
+    /** Deep enough for the widest history span the UI offers, as in the web store. */
+    historySeconds: Int = 120,
 ) {
     private val capacity = historySeconds * 250
     private val t0 = clock()

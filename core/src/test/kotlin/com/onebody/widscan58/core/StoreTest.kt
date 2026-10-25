@@ -176,4 +176,35 @@ class StoreTest {
         assertEquals(0, s.size)
         assertNull(Series(2).newest())
     }
+
+    @Test
+    fun `a window walk skips what fell off the left edge`() {
+        val s = Series(8)
+        for (j in 0 until 8) s.push(j.toDouble(), j.toFloat())
+        val seen = ArrayList<Double>()
+        // now=7 and a 3 s span reaches back to 4.0 inclusive.
+        s.forEachWithin(7.0, 3.0) { t, _ -> seen += t }
+        assertEquals(listOf(4.0, 5.0, 6.0, 7.0), seen)
+
+        val wrapped = ArrayList<Float>()
+        for (j in 8 until 12) s.push(j.toDouble(), j.toFloat())
+        s.forEachWithin(11.0, 2.5) { _, v -> wrapped += v }
+        assertEquals(listOf(9f, 10f, 11f), wrapped)
+
+        val boundary = ArrayList<Double>()
+        s.forEachWithin(11.0, 0.0) { t, _ -> boundary += t }
+        assertEquals("a zero span still keeps the sample taken now", listOf(11.0), boundary)
+
+        val past = ArrayList<Double>()
+        s.forEachWithin(12.0, 0.5) { t, _ -> past += t }
+        assertEquals(emptyList<Double>(), past)
+    }
+
+    @Test
+    fun `the history ring holds the widest span the UI offers`() {
+        val s = Store(clock)
+        s.setProfile(profileOf(channel(0)))
+        // 250 samples per second, so a 120 s window needs 120 * 250 slots before it wraps.
+        assertEquals(120 * 250, s.channels[0].rssi.capacity)
+    }
 }

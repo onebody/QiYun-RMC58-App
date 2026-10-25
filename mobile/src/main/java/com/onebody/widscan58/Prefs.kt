@@ -60,6 +60,16 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("showAvg", true)
         set(value) = sp.edit().putBoolean("showAvg", value).apply()
 
+    /** The history card's window; the store's ring is deep enough for the widest choice. */
+    var historySeconds: Int
+        get() = sp.getInt("historySeconds", 30)
+        set(value) = sp.edit().putInt("historySeconds", value).apply()
+
+    /** The EMA when the device reports one, the raw RSSI when it does not. */
+    var historySmoothed: Boolean
+        get() = sp.getBoolean("historyEma", true)
+        set(value) = sp.edit().putBoolean("historyEma", value).apply()
+
     private fun put(key: String, value: String) = sp.edit().putString(key, value).apply()
 
     companion object {

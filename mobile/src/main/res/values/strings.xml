@@ -118,4 +118,14 @@
     <string name="zoom_prev">上一个频道</string>
     <string name="zoom_next">下一个频道</string>
     <string name="waiting_metrics">等待通道数据…</string>
+
+    <string name="chip_history">历史</string>
+    <string name="history_title">RSSI 历史</string>
+    <string name="history_axis">dBFS/格 · 秒前</string>
+    <string name="history_span">%1$d 秒</string>
+    <string name="history_ema">平滑</string>
+    <string name="history_raw">原始</string>
+    <string name="history_clear">取消指针</string>
+    <string name="history_hint">在图上拖动即可读数</string>
+    <string name="waiting_history">该时刻没有采样</string>
 </resources>

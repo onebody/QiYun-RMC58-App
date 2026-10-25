@@ -66,7 +66,9 @@ class Widscan58Activity : Activity() {
     private lateinit var gainValue: TextView
     private lateinit var maxChip: Button
     private lateinit var avgChip: Button
+    private lateinit var historyChip: Button
     private var sheet: SettingsSheet? = null
+    private var history: HistorySheet? = null
 
     private var link: UsbSerialLink? = null
     private var sim: SimFeed? = null
@@ -123,9 +125,14 @@ class Widscan58Activity : Activity() {
             contentDescription = getString(R.string.settings_title)
             setOnClickListener { openSetup() }
         }
+        historyChip = chip(getString(R.string.chip_history)).apply {
+            contentDescription = getString(R.string.history_title)
+            setOnClickListener { openHistory() }
+        }
         bandRow.addView(maxChip)
         bandRow.addView(avgChip)
         bandRow.addView(setupButton)
+        bandRow.addView(historyChip)
         sheet = SettingsSheet(this, prefs, ::applySetting, ::refresh, ::planNames, ::applyPlan)
 
         // A tile is a button: it opens the channel's own chart. The panorama stays a scrubber.
@@ -182,6 +189,7 @@ class Widscan58Activity : Activity() {
         super.onPause()
         sheet?.dismiss()
         zoom?.dismiss()
+        history?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
         sim?.stop()
@@ -233,6 +241,7 @@ class Widscan58Activity : Activity() {
         setupButton.isEnabled = live
         sheet?.update(store.status)
         zoom?.update()
+        history?.update()
         statusLine.text = status()
     }
 
@@ -308,6 +317,12 @@ class Widscan58Activity : Activity() {
             selected = picked
             refresh()
         }.also { it.show(id) }
+    }
+
+    /** The whole plan across time, which is the one view the panorama cannot give. */
+    private fun openHistory() {
+        history?.dismiss()
+        history = HistorySheet(this, prefs, store).also { it.show(selected) }
     }
 
     /** One write, then the reply that lets the form show the device's state instead of our request. */
@@ -427,7 +442,8 @@ class Widscan58Activity : Activity() {
         minWidth = 0
         minimumWidth = 0
         minHeight = 0
-        setPadding(theme.dp(6f).roundToInt(), 0, theme.dp(6f).roundToInt(), 0)
+        // Tight enough that the English words still fit beside the six band letters.
+        setPadding(theme.dp(3f).roundToInt(), 0, theme.dp(3f).roundToInt(), 0)
         layoutParams = LinearLayout.LayoutParams(
             if (label.length == 1) theme.dp(40f).roundToInt() else LinearLayout.LayoutParams.WRAP_CONTENT,
             theme.dp(34f).roundToInt(),
