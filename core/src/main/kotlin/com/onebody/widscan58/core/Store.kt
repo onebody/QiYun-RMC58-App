@@ -87,6 +87,11 @@ class Store(
     var gpio: List<GpioPin> = emptyList()
         private set
 
+    /** The last finished raw I/Q capture, chunks and all: what the snapshot view draws. */
+    var rawiq: RawIq? = null
+        private set
+    private val rawiqChunks = RawIqAssembler()
+
     /** The protocol console's ring: what the board said, what we asked it to do. The RH poller
      *  appends to it while the screen walks it, hence the snapshot-iterator list. */
     val log = CopyOnWriteArrayList<LogLine>()
@@ -156,9 +161,10 @@ class Store(
                 FrameType.LEVELS -> onMetrics(parseLevels(item.payload))
                 FrameType.SPECTRUM -> onSpectrum(parseSpectrum(item.payload))
                 FrameType.TELEMETRY -> telemetry = parseTelemetry(item.payload)
+                FrameType.RAWIQ -> rawiqChunks.add(item.payload)?.let { rawiq = it }
                 // The firmware has never used this type, but the web prints it, so we do too.
                 FrameType.LOG -> addLog(LogDir.INFO, String(item.payload, Charsets.UTF_8).trim('\u0000', '\n', '\r'))
-                else -> Unit // raw IQ has no view outside the record file
+                else -> Unit
             }
         }
         version++

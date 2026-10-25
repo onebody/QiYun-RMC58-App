@@ -97,6 +97,9 @@ class Widscan58Activity : Activity() {
     private var gpio: GpioSheet? = null
     private var session: SessionSheet? = null
 
+    /** One raw capture at a time: the board holds its aperture while the sheet waits for the chunks. */
+    private var rawiq: RawIqSheet? = null
+
     /** Power meter mode: the board runs the calibration's scan while the page is open. */
     private var power: PowerSheet? = null
     private var monitorScan: Power.MonitorRestore? = null
@@ -247,6 +250,7 @@ class Widscan58Activity : Activity() {
         console?.dismiss()
         gpio?.dismiss()
         session?.dismiss()
+        rawiq?.dismiss()
         rhSheet?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
@@ -322,6 +326,7 @@ class Widscan58Activity : Activity() {
         session?.update()
         rhSheet?.update()
         power?.update()
+        rawiq?.update()
         statusLine.text = status()
     }
 
@@ -420,6 +425,7 @@ class Widscan58Activity : Activity() {
         menu.menu.add(0, MENU_SESSION, 0, R.string.session_title)
         menu.menu.add(0, MENU_RH, 0, R.string.rh_title)
         menu.menu.add(0, MENU_POWER, 0, R.string.power_title)
+        menu.menu.add(0, MENU_RAWIQ, 0, R.string.rawiq_title)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_SCALE -> panorama.autoScale()
@@ -430,6 +436,7 @@ class Widscan58Activity : Activity() {
                 MENU_SESSION -> openSession()
                 MENU_RH -> openRh()
                 MENU_POWER -> openPower()
+                MENU_RAWIQ -> openRawIq()
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -447,6 +454,12 @@ class Widscan58Activity : Activity() {
     private fun openTelemetry() {
         telemetry?.dismiss()
         telemetry = TelemetrySheet(this, store).also { it.show() }
+    }
+
+    /** The samples behind one reading, which is the only way to see what the ADC actually held. */
+    private fun openRawIq() {
+        rawiq?.dismiss()
+        rawiq = RawIqSheet(this, store, ::sendCapture).also { it.show(selected) }
     }
 
     /** Which pins the board drives at start-up — only a board can say. */
@@ -702,6 +715,11 @@ class Widscan58Activity : Activity() {
         refresh()
     }
 
+    /** A capture is answered by its own chunks, so there is nothing to read back after it. */
+    private fun sendCapture(line: String) {
+        command(line)
+    }
+
     private fun toggleScan() {
         command(if (scanRunning()) "SCAN STOP" else "SCAN START")
         command("STATUS?")
@@ -946,6 +964,7 @@ class Widscan58Activity : Activity() {
         private const val MENU_SESSION = 6
         private const val MENU_RH = 7
         private const val MENU_POWER = 8
+        private const val MENU_RAWIQ = 9
 
         /** The meter's spectrum span before a profile has said what it can tune. */
         private const val SPEC_FULL_SPAN_HZ = 40_000_000L

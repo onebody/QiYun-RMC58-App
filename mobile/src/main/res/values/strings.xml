@@ -313,4 +313,17 @@
     <string name="power_exit">退出功率计</string>
     <string name="power_entering">正在设置功率扫描…</string>
     <string name="power_left">已退出功率计</string>
+
+    <!-- 原始 I/Q 快照：一次采集的样本本身，星座图与时域/频域 -->
+    <string name="rawiq_title">原始 I/Q 快照</string>
+    <string name="rawiq_lo">LO kHz</string>
+    <string name="rawiq_samples">样本数</string>
+    <string name="rawiq_from_channel">用所选通道 LO</string>
+    <string name="rawiq_capture">采集</string>
+    <string name="rawiq_empty">采集一个快照即可查看原始样本</string>
+    <string name="rawiq_info">LO %1$s MHz · %2$s MS/s · %3$d 样本 · ×%4$s（10 bit 计数）· 直流 (%5$s, %6$s) · RMS %7$s · 峰值 %8$s/512</string>
+    <string name="rawiq_conjugated">已共轭</string>
+    <string name="rawiq_constellation">I/Q 星座图 · ±%1$d 计数</string>
+    <string name="rawiq_trace">I · Q — 传输计数</string>
+    <string name="rawiq_spectrum">每 bin dBFS · 跨度 %1$s MHz</string>
 </resources>

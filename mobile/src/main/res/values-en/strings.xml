@@ -311,4 +311,17 @@
     <string name="power_exit">Leave power meter</string>
     <string name="power_entering">Setting up the power scan…</string>
     <string name="power_left">Left power meter mode</string>
+
+    <!-- Raw I/Q snapshot: one capture's own samples, constellation, time and frequency -->
+    <string name="rawiq_title">Raw I/Q snapshot</string>
+    <string name="rawiq_lo">LO kHz</string>
+    <string name="rawiq_samples">Samples</string>
+    <string name="rawiq_from_channel">Use channel LO</string>
+    <string name="rawiq_capture">Capture</string>
+    <string name="rawiq_empty">Capture a snapshot to inspect raw samples</string>
+    <string name="rawiq_info">LO %1$s MHz · %2$s MS/s · %3$d samples · ×%4$s (10-bit counts) · DC (%5$s, %6$s) · RMS %7$s · peak %8$s/512</string>
+    <string name="rawiq_conjugated">conjugated</string>
+    <string name="rawiq_constellation">I/Q constellation · ±%1$d counts</string>
+    <string name="rawiq_trace">I · Q — transferred counts</string>
+    <string name="rawiq_spectrum">dBFS per bin · %1$s MHz span</string>
 </resources>

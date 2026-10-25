@@ -21,8 +21,13 @@ import com.onebody.widscan58.core.encodeFrame
 import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.random.Random
 
 /** dBFS of each channel's transmitter; a value at the floor means no transmitter. */
@@ -129,6 +134,12 @@ class SimFeed(
             "CONJ" -> cfg.conjugate = if (word == "1") 1 else 0
             "IQCORR" -> cfg.iqCorr = if (word == "1") 1 else 0
             "ENABLE" -> word?.toIntOrNull()?.let { cfg.enabled = it and 0xff }
+            "RAWIQ" -> {
+                republish = false
+                val lo = word?.toLongOrNull()
+                val samples = p.getOrNull(2)?.toIntOrNull()
+                if (lo != null && samples != null) rawiq(lo, samples) else known = false
+            }
             "GPIO?" -> republish = false
             "GPIO" -> {
                 republish = false
@@ -171,8 +182,9 @@ class SimFeed(
             "TIMING?" -> "TIMING psd 900 (prep 210 fft 520 power 170) metrics 260 spectrum 180"
             "GPIO?" -> gpioReply()
             // STATUS? and CONFIG? are the JSON the sim already applies directly; a
-            // hand-written copy would only be a worse version of it.
-            "STATUS?", "CONFIG?", "PROFILE?" -> return
+            // hand-written copy would only be a worse version of it. RAWIQ is answered by
+            // its chunks, and the last one is the reply.
+            "STATUS?", "CONFIG?", "PROFILE?", "RAWIQ" -> return
             else -> if (known) "OK" else "ERR command"
         }
         line(text)
@@ -267,6 +279,61 @@ class SimFeed(
         sink(encodeFrame(FrameType.TELEMETRY, telemetryPayload(rotations, running, hops.size)))
     }
 
+    /**
+     * A raw capture at [loKhz]: the transmitters inside the passband, the board's own spurs,
+     * its DC offset and the ADC's dither - in chunks of 1024 samples, as the firmware sends them.
+     */
+    private fun rawiq(loKhz: Long, samples: Int) {
+        val n = samples.coerceIn(RAWIQ_CHUNK, RAWIQ_MAX)
+        val loHz = loKhz * 1000.0
+        val tones = (plan.map { it.khz * 1000.0 to VTX_DB.getOrElse(it.id) { FLOOR_DB } } +
+            listOf(INTERFERENCE_HZ to -70.0, SPUR_A_HZ to -78.0))
+            .filter { abs(it.first - loHz) < PASSBAND_HZ }
+            .map { (it.first - loHz) / RATE_HZ to iqAmplitude(it.second) }
+        val phases = DoubleArray(tones.size) { rnd.nextDouble(0.0, 2 * PI) }
+        val i = ByteArray(n)
+        val q = ByteArray(n)
+        for (j in 0 until n) {
+            var re = IQ_DC_I + rnd.nextDouble(-IQ_NOISE, IQ_NOISE)
+            var im = IQ_DC_Q + rnd.nextDouble(-IQ_NOISE, IQ_NOISE)
+            tones.forEachIndexed { k, (cycles, amp) ->
+                val ph = phases[k] + 2 * PI * cycles * j
+                re += amp * cos(ph)
+                im += amp * sin(ph)
+            }
+            i[j] = re.roundToInt().coerceIn(-128, 127).toByte()
+            q[j] = im.roundToInt().coerceIn(-128, 127).toByte()
+        }
+        for (off in 0 until n step RAWIQ_CHUNK) {
+            sink(encodeFrame(FrameType.RAWIQ, rawiqPayload(loKhz, n, off, minOf(RAWIQ_CHUNK, n - off), i, q)))
+        }
+    }
+
+    /**
+     * A dBFS level in transferred counts. The 71 dB between the sim's loudest channel and its
+     * floor is squeezed to half that slope: at the true one the whole band would sit under the
+     * dither, and the view would only ever show noise.
+     */
+    private fun iqAmplitude(dbfs: Double): Double =
+        if (dbfs <= FLOOR_DB + 2) 0.0
+        else (IQ_NOISE * 10.0.pow((dbfs - FLOOR_DB) / 40)).coerceAtMost(IQ_FULL - 8.0)
+
+    private fun rawiqPayload(loKhz: Long, n: Int, offset: Int, len: Int, i: ByteArray, q: ByteArray): ByteArray {
+        val p = ByteArray(14 + 2 * len)
+        ByteBuffer.wrap(p).order(ByteOrder.LITTLE_ENDIAN)
+            .putInt(0, loKhz.toInt())
+            .putInt(4, RATE_HZ.toInt())
+            .putShort(8, n.toShort())
+            .putShort(10, offset.toShort())
+            .put(12, cfg.conjugate.toByte())
+            .put(13, IQ_SHIFT.toByte())
+        for (j in 0 until len) {
+            p[14 + 2 * j] = i[offset + j]
+            p[15 + 2 * j] = q[offset + j]
+        }
+        return p
+    }
+
     /** Tell the engine which band it is scanning and how, exactly as PROFILE? and STATUS? would. */
     private fun publish() {
         val hops = hops()
@@ -281,9 +348,9 @@ class SimFeed(
             baseKhz = first.khz,
             equivBaseKhz = first.khz,
             scale = 1.0,
-            rateHz = 80_000_000,
+            rateHz = RATE_HZ,
             usableHz = 40_000_000,
-            passbandHz = 18_000_000,
+            passbandHz = PASSBAND_HZ.toLong(),
             rssiHz = cfg.rssiHz,
             searchHz = cfg.searchHz,
             channels = plan,
@@ -305,7 +372,7 @@ class SimFeed(
             gainMode = cfg.gainMode,
             gain = cfg.gain,
             gainMax = cfg.gainMax,
-            rawiqMax = null,
+            rawiqMax = RAWIQ_MAX,
             recal = cfg.recal,
             metrics = cfg.metrics,
             rssiHz = cfg.rssiHz,
@@ -371,6 +438,17 @@ class SimFeed(
         private const val HOP_MS = 130L
         private const val TELEMETRY_EVERY = 4
         private const val FILTER_MAX = 63
+        private const val RATE_HZ = 80_000_000L
+        private const val PASSBAND_HZ = 18_000_000.0
+
+        /** The capture wire: 1024 samples a chunk, 16380 a buffer, and 2 bits of shift off 10. */
+        private const val RAWIQ_CHUNK = 1024
+        private const val RAWIQ_MAX = 16_380
+        private const val IQ_SHIFT = 2
+        private const val IQ_FULL = 512.0 / (1 shl IQ_SHIFT)
+        private const val IQ_NOISE = 1.5
+        private const val IQ_DC_I = 1.5
+        private const val IQ_DC_Q = -1.0
 
         /** The C5 has GPIO0-28; the USB and flash pins are the firmware's to keep. */
         private const val GPIO_PINS = 29
