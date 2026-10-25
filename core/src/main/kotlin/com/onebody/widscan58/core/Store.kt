@@ -32,6 +32,9 @@ class ChannelState(capacity: Int) {
     val rssi = Series(capacity)
     val ema = Series(capacity)
     val floor = Series(capacity)
+
+    /** 1 where the capture clipped, at the same times as [rssi]: power averaging leaves those out. */
+    val clipped = Series(capacity)
 }
 
 /** One LO's spectrum, with the holds derived from it. */
@@ -189,6 +192,7 @@ class Store(
             st.loKhz = m.loKhz
             st.updated = t
             st.rssi.push(t, c.rssi.toFloat())
+            st.clipped.push(t, if (c.has(ChannelFlag.SATURATED)) 1f else 0f)
             c.rssiEma?.let { st.ema.push(t, it.toFloat()) }
             c.floor?.let { st.floor.push(t, it.toFloat()) }
         }
