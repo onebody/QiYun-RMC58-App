@@ -6,10 +6,12 @@ import android.app.Activity
 import android.content.Intent
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.provider.OpenableColumns
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -27,11 +29,15 @@ import com.onebody.widscan58.core.GainMode
 import com.onebody.widscan58.core.LinkRate
 import com.onebody.widscan58.core.LogDir
 import com.onebody.widscan58.core.Scheduler
+import com.onebody.widscan58.core.SessionRecorder
 import com.onebody.widscan58.core.StreamItem
 import com.onebody.widscan58.core.StreamParser
 import com.onebody.widscan58.core.Store
 import com.onebody.widscan58.core.channelTile
+import com.onebody.widscan58.core.channelsCsv
+import com.onebody.widscan58.core.readSession
 import com.onebody.widscan58.core.restoreCommands
+import com.onebody.widscan58.core.spectrumCsv
 import com.onebody.widscan58.usb.CdcLayout
 import com.onebody.widscan58.usb.UsbAccess
 import com.onebody.widscan58.usb.UsbSerialLink
@@ -41,6 +47,10 @@ import com.onebody.widscan58.usb.usbExtra
 import com.onebody.widscan58.view.ChannelTileView
 import com.onebody.widscan58.view.PanoramaView
 import com.onebody.widscan58.view.Style
+import java.io.OutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 
 class Widscan58Activity : Activity() {
@@ -55,6 +65,10 @@ class Widscan58Activity : Activity() {
 
     private val prefs by lazy { Prefs(this) }
     private val store = Store({ SystemClock.elapsedRealtime() }, JsonReplies())
+
+    /** The wire of whichever source is running, so a capture can be saved any time. */
+    private val recorder = SessionRecorder({ SystemClock.elapsedRealtime() })
+    private val feed = ReplayFeed(main, ::feedBytes, ::replayFinished)
 
     private lateinit var theme: Style
     private lateinit var panorama: PanoramaView
@@ -76,6 +90,7 @@ class Widscan58Activity : Activity() {
     private var telemetry: TelemetrySheet? = null
     private var console: ConsoleSheet? = null
     private var gpio: GpioSheet? = null
+    private var session: SessionSheet? = null
 
     /** The web card derives these from the counters, and does it whether or not it is on screen. */
     private val linkRate = LinkRate()
@@ -91,6 +106,7 @@ class Widscan58Activity : Activity() {
     private var lastFrameMs = 0L
     private var drawnVersion = -1L
     private var note = ""
+    private var pendingName = ""
     private var showSim = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -177,7 +193,9 @@ class Widscan58Activity : Activity() {
         // `adb shell am start -n com.onebody.widscan58/.Widscan58Activity --ez sim true`
         showSim = intent.getBooleanExtra("sim", false)
         if (showSim) {
-            sim = SimFeed(store, main, ::refresh).also { it.start() }
+            // The simulator puts wire bytes on the same sink a board does, so it needs the same parser.
+            parser = StreamParser()
+            sim = SimFeed(main, ::feedBytes, ::refresh).also { it.start() }
             // The same restore a board gets, so the sim comes up in the stored state.
             handshake()
         }
@@ -187,6 +205,7 @@ class Widscan58Activity : Activity() {
         super.onResume()
         main.post(drawLoop)
         main.postDelayed(watchdog, WATCHDOG_PERIOD_MS)
+        feed.resume()
         if (showSim) sim?.start()
         if (link == null) findBoard(usbManager())?.let(::requestAndOpen)
     }
@@ -206,8 +225,10 @@ class Widscan58Activity : Activity() {
         telemetry?.dismiss()
         console?.dismiss()
         gpio?.dismiss()
+        session?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
+        feed.pause()
         sim?.stop()
         closeLink(getString(R.string.note_paused))
     }
@@ -262,6 +283,7 @@ class Widscan58Activity : Activity() {
         telemetry?.update(linkCounters())
         console?.update()
         gpio?.update()
+        session?.update()
         statusLine.text = status()
     }
 
@@ -272,6 +294,7 @@ class Widscan58Activity : Activity() {
         if (note.isNotEmpty()) parts.add(note)
         val l = link
         when {
+            feed.started -> parts.add(getString(R.string.status_replay, feed.name))
             l != null -> parts.add(l.description)
             sim != null -> parts.add(getString(R.string.status_sim))
             else -> return note.ifEmpty { getString(R.string.plug_in) }
@@ -352,6 +375,7 @@ class Widscan58Activity : Activity() {
         menu.menu.add(0, MENU_TELEMETRY, 0, R.string.telemetry_title)
         menu.menu.add(0, MENU_CONSOLE, 0, R.string.console_title)
         menu.menu.add(0, MENU_GPIO, 0, R.string.gpio_title)
+        menu.menu.add(0, MENU_SESSION, 0, R.string.session_title)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_SCALE -> panorama.autoScale()
@@ -359,6 +383,7 @@ class Widscan58Activity : Activity() {
                 MENU_TELEMETRY -> openTelemetry()
                 MENU_CONSOLE -> openConsole()
                 MENU_GPIO -> openGpio()
+                MENU_SESSION -> openSession()
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -388,6 +413,153 @@ class Widscan58Activity : Activity() {
         gpio?.dismiss()
         gpio = GpioSheet(this, store, ::applyGpio).also { it.show() }
     }
+
+    /** Record the wire, play a capture back, or hand the readings to a spreadsheet. */
+    private fun openSession() {
+        session?.dismiss()
+        session = SessionSheet(
+            this,
+            recorder,
+            feed,
+            object : SessionActions {
+                override fun recordable() = link != null || sim != null
+
+                // A replay takes the place of a source, so nothing else may be running to start one.
+                override fun replayable() = link == null && sim == null && !recorder.active
+
+                override fun startRecording() {
+                    recorder.begin(JsonWrites.sessionPreamble(store))
+                    note = ""
+                    refresh()
+                }
+
+                override fun stopAndSave() {
+                    recorder.stop()
+                    saveRecording()
+                }
+
+                override fun saveLast() = saveRecording()
+
+                override fun pickReplay() = pickFile(REQ_OPEN_SESSION, true, "", ANY_TYPE)
+
+                override fun stopReplay() = replayFinished()
+
+                override fun export(kind: ExportKind) = pickFile(
+                    if (kind == ExportKind.CHANNELS) REQ_SAVE_CHANNELS else REQ_SAVE_SPECTRUM,
+                    false,
+                    "widscan58-" + kind.name.lowercase(Locale.US) + "-" + stamp() + ".csv",
+                    MIME_CSV,
+                )
+
+                override fun note() = this@Widscan58Activity.note
+            },
+        ).also { it.show() }
+    }
+
+    private fun saveRecording() = pickFile(REQ_SAVE_SESSION, false, "widscan58-" + stamp() + ".widscan58", MIME_SESSION)
+
+    /** The storage app runs outside the process, so it answers through onActivityResult. */
+    private fun pickFile(request: Int, open: Boolean, name: String, mime: String) {
+        pendingName = name
+        val intent = Intent(if (open) Intent.ACTION_OPEN_DOCUMENT else Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = mime
+            if (!open) putExtra(Intent.EXTRA_TITLE, name)
+        }
+        runCatching { startActivityForResult(intent, request) }
+            .onFailure { note = getString(R.string.note_save_failed, name, it.message.orEmpty()) }
+        refresh()
+    }
+
+    override fun onActivityResult(request: Int, result: Int, data: Intent?) {
+        super.onActivityResult(request, result, data)
+        val uri = data?.data
+        if (result != RESULT_OK || uri == null) {
+            // A cancelled save keeps the capture, so the sheet still offers to save it.
+            refresh()
+            return
+        }
+        when (request) {
+            REQ_SAVE_SESSION -> {
+                val written = formatBytes(recorder.bytes)
+                writeFile(uri, pendingName, written, recorder::discard) { recorder.writeTo(it) }
+            }
+            REQ_SAVE_CHANNELS -> writeText(uri, pendingName, channelsCsv(store))
+            REQ_SAVE_SPECTRUM -> writeText(uri, pendingName, spectrumCsv(store))
+            else -> readReplay(uri)
+        }
+    }
+
+    /** A phone's storage provider is slow enough to stay off the drawing thread. */
+    private fun writeFile(
+        uri: Uri,
+        name: String,
+        detail: String,
+        done: () -> Unit = {},
+        body: (OutputStream) -> Unit,
+    ) {
+        Thread {
+            val outcome = runCatching { contentResolver.openOutputStream(uri)?.use(body) ?: error("no stream for " + uri) }
+            main.post {
+                val ok = outcome.isSuccess
+                if (ok) done()
+                note = if (ok) {
+                    getString(R.string.note_saved, name, detail)
+                } else {
+                    getString(R.string.note_save_failed, name, outcome.exceptionOrNull()?.message.orEmpty())
+                }
+                refresh()
+            }
+        }.start()
+    }
+
+    private fun writeText(uri: Uri, name: String, text: String) {
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        writeFile(uri, name, formatBytes(bytes.size.toLong())) { it.write(bytes) }
+    }
+
+    private fun readReplay(uri: Uri) {
+        val name = displayName(uri)
+        Thread {
+            val read = runCatching { contentResolver.openInputStream(uri)?.use { readSession(it) } ?: emptyList() }
+            main.post {
+                val chunks = read.getOrDefault(emptyList())
+                note = when {
+                    read.isFailure -> getString(R.string.note_replay_failed, name, read.exceptionOrNull()?.message.orEmpty())
+                    chunks.isEmpty() -> getString(R.string.note_replay_empty)
+                    else -> ""
+                }
+                if (chunks.isNotEmpty()) {
+                    // A replay owns the parser exactly as a board does: the store cannot tell them apart.
+                    parser = StreamParser()
+                    lastFrameMs = SystemClock.elapsedRealtime()
+                    feed.start(name, chunks)
+                }
+                refresh()
+            }
+        }.start()
+    }
+
+    /** The session ran out, or the user stopped it: put the instrument back on standby. */
+    private fun replayFinished() {
+        feed.stop()
+        parser = null
+        note = getString(R.string.note_replay_finished)
+        refresh()
+    }
+
+    /** What the storage app calls the file, which is not the last segment of a content: URI. */
+    private fun displayName(uri: Uri): String {
+        var name = ""
+        val column = OpenableColumns.DISPLAY_NAME
+        contentResolver.query(uri, arrayOf(column), null, null, null)?.use { c ->
+            val at = c.getColumnIndex(column)
+            if (at >= 0 && c.moveToFirst()) name = c.getString(at).orEmpty()
+        }
+        return name.ifEmpty { uri.lastPathSegment?.substringAfterLast('/').orEmpty() }
+    }
+
+    private fun stamp(): String = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
 
     /** KiB/s and dropped frames are rates off counters, so they need sampling between the panels. */
     private fun sampleLink() {
@@ -434,12 +606,12 @@ class Widscan58Activity : Activity() {
     private fun usbManager() = getSystemService(UsbManager::class.java)!!
 
     private fun requestAndOpen(device: UsbDevice) {
-        if (link != null) return
+        if (link != null || sim != null || feed.started) return
         UsbAccess.withPermission(this, device, ::openLink) { note = it }
     }
 
     private fun openLink(device: UsbDevice) {
-        if (link != null) return
+        if (link != null || feed.started) return
         val layout: CdcLayout = cdcLayoutOf(device)
             ?: run {
                 note = getString(R.string.note_no_cdc, device.deviceName)
@@ -451,7 +623,7 @@ class Widscan58Activity : Activity() {
         link = opened
         parser = StreamParser()
         runner = CommandRunner(write = { opened.write(it) }, scheduler = scheduler)
-        opened.onBytes = ::onBytes
+        opened.onBytes = ::feedBytes
         opened.onClose = { why -> main.post { closeLink(why) } }
         lastFrameMs = SystemClock.elapsedRealtime()
         note = ""
@@ -473,8 +645,9 @@ class Widscan58Activity : Activity() {
         command("INFO")
     }
 
-    /** Bytes arrive on the reader thread; every state change is marshalled to the UI. */
-    private fun onBytes(chunk: ByteArray) {
+    /** Bytes arrive on the reader thread, or on the main one from a replay; state changes go to the UI. */
+    private fun feedBytes(chunk: ByteArray) {
+        recorder.add(chunk)
         val items = parser?.push(chunk) ?: return
         if (items.isEmpty()) return
         val sawFrame = items.any { it is StreamItem.Frame }
@@ -501,6 +674,11 @@ class Widscan58Activity : Activity() {
     }
 
     private fun command(line: String, reply: (CommandResult) -> Unit = {}) {
+        if (feed.started) {
+            note = getString(R.string.note_replay_readonly)
+            refresh()
+            return
+        }
         store.addLog(LogDir.TX, line)
         sim?.let {
             it.onCommand(line)
@@ -560,6 +738,16 @@ class Widscan58Activity : Activity() {
         private const val MENU_TELEMETRY = 3
         private const val MENU_CONSOLE = 4
         private const val MENU_GPIO = 5
+        private const val MENU_SESSION = 6
+        private const val REQ_SAVE_SESSION = 20
+        private const val REQ_SAVE_CHANNELS = 21
+        private const val REQ_SAVE_SPECTRUM = 22
+        private const val REQ_OPEN_SESSION = 23
+        private const val MIME_SESSION = "application/octet-stream"
+        private const val MIME_CSV = "text/csv"
+
+        /** ACTION_OPEN_DOCUMENT wants a wildcard: a capture has no registered type. */
+        private const val ANY_TYPE = "*/*"
         private val TILE_IDS = intArrayOf(
             R.id.tile0, R.id.tile1, R.id.tile2, R.id.tile3, R.id.tile4, R.id.tile5, R.id.tile6, R.id.tile7,
         )

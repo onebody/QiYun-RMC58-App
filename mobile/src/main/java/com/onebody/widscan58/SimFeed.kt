@@ -1,10 +1,10 @@
 // A simulated device, so the instrument can be laid out and demoed without
 // hardware: `adb shell am start -n com.onebody.widscan58/.Widscan58Activity --ez sim true`.
-// It writes the same SPECTRUM / METRICS / TELEMETRY payloads the firmware does
-// (firmware/src/proto/frames.h) for a band of VTXs plus the board spurs and a
-// wide interference bump, and answers the sweep commands the settings sheet
-// sends. Only that intent extra starts it, and it never touches the USB stack.
-// Mirrors web/src/mock/mockDevice.ts. GPL-3.0-or-later.
+// It puts the same bytes on the wire as the firmware does (frames.h) for a band of
+// VTXs plus the board spurs and a wide interference bump, and answers the sweep
+// commands the settings sheet sends, so the link's own parser, recorder and console
+// see it exactly as they see a board. Only that intent extra starts it, and it never
+// touches the USB stack. Mirrors web/src/mock/mockDevice.ts. GPL-3.0-or-later.
 package com.onebody.widscan58
 
 import android.os.Handler
@@ -17,8 +17,7 @@ import com.onebody.widscan58.core.PlanHop
 import com.onebody.widscan58.core.Profile
 import com.onebody.widscan58.core.ProfileChannel
 import com.onebody.widscan58.core.Status
-import com.onebody.widscan58.core.Store
-import com.onebody.widscan58.core.StreamItem
+import com.onebody.widscan58.core.encodeFrame
 import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -40,8 +39,9 @@ private val VTX_FLAGS = intArrayOf(
 )
 
 class SimFeed(
-    private val store: Store,
     private val main: Handler,
+    /** The same sink the USB link writes into: bytes, not decoded items. */
+    private val sink: (ByteArray) -> Unit,
     private val onChanged: () -> Unit,
 ) {
     private val rnd = Random(20261025)
@@ -175,8 +175,11 @@ class SimFeed(
             "STATUS?", "CONFIG?", "PROFILE?" -> return
             else -> if (known) "OK" else "ERR command"
         }
-        store.ingest(StreamItem.Text(text))
+        line(text)
     }
+
+    /** The same wire a reply takes: one line, terminated the way the firmware terminates it. */
+    private fun line(text: String) = sink((text + "\n").toByteArray(Charsets.UTF_8))
 
     /** The same shape as the firmware's send_gpio(): the pin count and one character each. */
     private fun gpioReply(): String {
@@ -197,9 +200,9 @@ class SimFeed(
         val hops = hops()
         val ch = hops[hop % hops.size]
         if (cfg.specEvery == 0 || hop % cfg.specEvery == 0) {
-            store.ingest(StreamItem.Frame(FrameType.SPECTRUM, spectrumAt(ch)))
+            sink(encodeFrame(FrameType.SPECTRUM, spectrumAt(ch)))
         }
-        store.ingest(StreamItem.Frame(FrameType.METRICS, metricsAt(ch, hops)))
+        sink(encodeFrame(FrameType.METRICS, metricsAt(ch, hops)))
         hop++
         if (hop % hops.size == 0) rotations++
     }
@@ -261,65 +264,63 @@ class SimFeed(
 
     private fun emitTelemetry() {
         val hops = hops()
-        store.ingest(StreamItem.Frame(FrameType.TELEMETRY, telemetryPayload(rotations, running, hops.size)))
+        sink(encodeFrame(FrameType.TELEMETRY, telemetryPayload(rotations, running, hops.size)))
     }
 
     /** Tell the engine which band it is scanning and how, exactly as PROFILE? and STATUS? would. */
     private fun publish() {
         val hops = hops()
         val first = plan.first()
-        store.setProfile(
-            Profile(
-                name = "sim-${first.name.take(1)}",
-                description = "Raceband R1-R8 [SIMULATED]",
-                target = "esp32-c5",
-                bandKhz = longArrayOf(plan.minOf { it.khz } - 40_000, plan.maxOf { it.khz } + 40_000),
-                baseKhz = first.khz,
-                equivBaseKhz = first.khz,
-                scale = 1.0,
-                rateHz = 80_000_000,
-                usableHz = 40_000_000,
-                passbandHz = 18_000_000,
-                rssiHz = cfg.rssiHz,
-                searchHz = cfg.searchHz,
-                channels = plan,
-            ),
+        val profile = Profile(
+            name = "sim-${first.name.take(1)}",
+            description = "Raceband R1-R8 [SIMULATED]",
+            target = "esp32-c5",
+            bandKhz = longArrayOf(plan.minOf { it.khz } - 40_000, plan.maxOf { it.khz } + 40_000),
+            baseKhz = first.khz,
+            equivBaseKhz = first.khz,
+            scale = 1.0,
+            rateHz = 80_000_000,
+            usableHz = 40_000_000,
+            passbandHz = 18_000_000,
+            rssiHz = cfg.rssiHz,
+            searchHz = cfg.searchHz,
+            channels = plan,
         )
-        store.setStatus(
-            Status(
-                profile = "sim",
-                running = if (running) 1 else 0,
-                enabled = cfg.enabled,
-                mode = cfg.mode,
-                captureSamples = cfg.captureSamples,
-                nfft = cfg.nfft,
-                segments = cfg.segments,
-                rateCode = 1,
-                filter = cfg.filter,
-                conjugate = cfg.conjugate,
-                iqCorr = cfg.iqCorr,
-                settleUs = cfg.settleUs,
-                tskip = cfg.tskip,
-                gainMode = cfg.gainMode,
-                gain = cfg.gain,
-                gainMax = cfg.gainMax,
-                rawiqMax = null,
-                recal = cfg.recal,
-                metrics = cfg.metrics,
-                rssiHz = cfg.rssiHz,
-                searchHz = cfg.searchHz,
-                dcGuard = 3,
-                ema = cfg.ema,
-                clearEma = cfg.clearEma,
-                signalDb = 6.0,
-                avgShift = 1,
-                specEvery = cfg.specEvery,
-                specBins = cfg.specBins,
-                specSpanHz = cfg.specSpanHz,
-                specDetector = cfg.specDetector,
-                plan = hops.map { PlanHop(it.khz, intArrayOf(it.id), longArrayOf(0)) },
-            ),
+        val status = Status(
+            profile = "sim",
+            running = if (running) 1 else 0,
+            enabled = cfg.enabled,
+            mode = cfg.mode,
+            captureSamples = cfg.captureSamples,
+            nfft = cfg.nfft,
+            segments = cfg.segments,
+            rateCode = 1,
+            filter = cfg.filter,
+            conjugate = cfg.conjugate,
+            iqCorr = cfg.iqCorr,
+            settleUs = cfg.settleUs,
+            tskip = cfg.tskip,
+            gainMode = cfg.gainMode,
+            gain = cfg.gain,
+            gainMax = cfg.gainMax,
+            rawiqMax = null,
+            recal = cfg.recal,
+            metrics = cfg.metrics,
+            rssiHz = cfg.rssiHz,
+            searchHz = cfg.searchHz,
+            dcGuard = 3,
+            ema = cfg.ema,
+            clearEma = cfg.clearEma,
+            signalDb = 6.0,
+            avgShift = 1,
+            specEvery = cfg.specEvery,
+            specBins = cfg.specBins,
+            specSpanHz = cfg.specSpanHz,
+            specDetector = cfg.specDetector,
+            plan = hops.map { PlanHop(it.khz, intArrayOf(it.id), longArrayOf(0)) },
         )
+        line("PROFILE " + JsonWrites.profile(profile))
+        line("STATUS " + JsonWrites.status(status))
     }
 
     private class MetricRecord(

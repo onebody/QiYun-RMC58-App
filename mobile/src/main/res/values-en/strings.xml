@@ -179,4 +179,27 @@
     <string name="gpio_revert">Revert</string>
     <string name="gpio_revert_hint">Put the saved settings back in effect</string>
     <string name="gpio_none">No GPIO settings yet: this firmware may not have them.</string>
+
+    <string name="session_title">Recording and export</string>
+    <string name="session_intro">Records the raw byte stream from the device as a .widscan58 file that replays here or in the web UI. CSV export works without a recording.</string>
+    <string name="session_record">● Start recording</string>
+    <string name="session_stop">■ Stop and save</string>
+    <string name="session_save_last">Save last recording</string>
+    <string name="session_replay">Choose a file to replay…</string>
+    <string name="session_stop_replay">Stop replay</string>
+    <string name="session_export_channels">Export channels CSV</string>
+    <string name="session_export_spectrum">Export spectrum CSV</string>
+    <string name="session_idle">Nothing recording, nothing replaying.</string>
+    <string name="session_recording">Recording: %1$s</string>
+    <string name="session_stored">%1$s recorded, not saved yet.</string>
+    <string name="session_overflow">Reached the %1$s cap; later data was not recorded.</string>
+    <string name="session_replaying">Replaying %1$s: %2$s / %3$s</string>
+    <string name="session_replay_paused">Replay paused: %1$s</string>
+    <string name="status_replay">Replaying %1$s</string>
+    <string name="note_replay_finished">Replay finished</string>
+    <string name="note_replay_readonly">A replay is read-only: no commands can be sent</string>
+    <string name="note_saved">Saved %1$s (%2$s)</string>
+    <string name="note_save_failed">Saving %1$s failed: %2$s</string>
+    <string name="note_replay_empty">That file holds no complete record</string>
+    <string name="note_replay_failed">Reading %1$s failed: %2$s</string>
 </resources>

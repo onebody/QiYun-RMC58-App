@@ -181,4 +181,27 @@
     <string name="gpio_revert">还原</string>
     <string name="gpio_revert_hint">恢复到已保存的设置</string>
     <string name="gpio_none">还没有 GPIO 信息：这条固件可能没有 GPIO 配置。</string>
+
+    <string name="session_title">录制与导出</string>
+    <string name="session_intro">录制设备发来的原始字节流（.widscan58），可在本机或网页版回放；导出 CSV 不依赖录制。</string>
+    <string name="session_record">● 开始录制</string>
+    <string name="session_stop">■ 停止并保存</string>
+    <string name="session_save_last">保存上次录制</string>
+    <string name="session_replay">选择回放文件…</string>
+    <string name="session_stop_replay">停止回放</string>
+    <string name="session_export_channels">导出频道 CSV</string>
+    <string name="session_export_spectrum">导出频谱 CSV</string>
+    <string name="session_idle">没有录制，也没有回放。</string>
+    <string name="session_recording">正在录制：%1$s</string>
+    <string name="session_stored">已录制 %1$s，尚未保存。</string>
+    <string name="session_overflow">已达到 %1$s 上限，之后的数据没有记下来。</string>
+    <string name="session_replaying">回放 %1$s：%2$s / %3$s</string>
+    <string name="session_replay_paused">回放已暂停：%1$s</string>
+    <string name="status_replay">回放 %1$s</string>
+    <string name="note_replay_finished">回放结束</string>
+    <string name="note_replay_readonly">回放是只读的：不能再发送命令</string>
+    <string name="note_saved">已保存 %1$s（%2$s）</string>
+    <string name="note_save_failed">保存 %1$s 失败：%2$s</string>
+    <string name="note_replay_empty">这个文件里没有一条完整记录</string>
+    <string name="note_replay_failed">读取 %1$s 失败：%2$s</string>
 </resources>
