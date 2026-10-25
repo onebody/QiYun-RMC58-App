@@ -23,6 +23,9 @@
     <string name="waterfall_age">-%1$.1fs</string>
     <string name="tile_snr">SNR %1$s</string>
     <string name="tile_floor">floor %1$s</string>
+    <string name="tile_clear">clear %1$s</string>
+    <string name="tile_centre">centre %1$s</string>
+    <string name="tile_obw">OBW 99%% %1$s</string>
 
     <string name="badge_stale">stale</string>
     <string name="badge_signal">signal</string>

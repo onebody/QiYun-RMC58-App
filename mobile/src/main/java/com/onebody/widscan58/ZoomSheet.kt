@@ -19,6 +19,7 @@ import com.onebody.widscan58.view.Style
 import com.onebody.widscan58.view.ZoomView
 import com.onebody.widscan58.view.fmtDb
 import com.onebody.widscan58.view.fmtDbfs
+import com.onebody.widscan58.view.fmtOffsetKHz
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -146,23 +147,19 @@ class ZoomSheet(
         )
         m.snr?.let { items += str(R.string.zoom_snr) + " " + String.format(Locale.US, "%.1f dB", it) }
         m.floor?.let { items += str(R.string.zoom_floor) + " " + fmtDbfs(it) }
-        m.centroidOffHz?.let { items += str(R.string.zoom_center) + " " + if (occupied) offKhz(it) else DASH }
+        m.centroidOffHz?.let { items += str(R.string.zoom_center) + " " + if (occupied) fmtOffsetKHz(it) else DASH }
         m.peak?.let { items += str(R.string.zoom_peak) + " " + if (signal) fmtDbfs(it) else DASH }
-        m.peakOffHz?.let { items += str(R.string.zoom_occupied) + " " + if (occupied) offKhz(it) else DASH }
+        m.peakOffHz?.let { items += str(R.string.zoom_occupied) + " " + if (occupied) fmtOffsetKHz(it) else DASH }
         val lo = m.obwLoHz
         val hi = m.obwHiHz
         if (lo != null && hi != null) {
             val width = if (occupied)
-                String.format(Locale.US, "%.2f MHz (%s … %s)", (hi - lo) / 1e6, offKhz(lo), offKhz(hi))
+                String.format(Locale.US, "%.2f MHz (%s … %s)", (hi - lo) / 1e6, fmtOffsetKHz(lo), fmtOffsetKHz(hi))
             else DASH
             items += str(R.string.zoom_obw) + " " + width
         }
         return items.joinToString("   ")
     }
-
-    /** The firmware reports the occupancy offsets in hertz; the chart reads them in kHz. */
-    private fun offKhz(hz: Long): String =
-        String.format(Locale.US, "%+.0f kHz", hz / 1000.0)
 
     private fun arrow(glyph: String, label: Int, click: () -> Unit) = TextView(activity).apply {
         text = glyph

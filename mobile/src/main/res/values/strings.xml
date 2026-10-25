@@ -25,6 +25,9 @@
     <string name="waterfall_age">-%1$.1f秒</string>
     <string name="tile_snr">信噪比 %1$s</string>
     <string name="tile_floor">底噪 %1$s</string>
+    <string name="tile_clear">最净底噪 %1$s</string>
+    <string name="tile_centre">中心 %1$s</string>
+    <string name="tile_obw">占用带宽 %1$s</string>
 
     <string name="badge_stale">数据过期</string>
     <string name="badge_signal">有信号</string>

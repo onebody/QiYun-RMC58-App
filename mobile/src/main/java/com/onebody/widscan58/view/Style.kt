@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import com.onebody.widscan58.R
+import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.log10
 import kotlin.math.pow
@@ -100,4 +101,10 @@ fun fmtDb(v: Double?): String = if (v == null) "—" else String.format("%.1f", 
 fun fmtDbfs(v: Double?): String = if (v == null) "—" else String.format("%.1f dBFS", v)
 
 fun fmtMHz(khz: Double): String = String.format("%.1f", khz / 1000.0)
+
+/** Signed offset from the channel centre: the device counts hertz, the readout kHz. */
+fun fmtOffsetKHz(hz: Long): String = String.format(java.util.Locale.US, "%+.0f kHz", hz / 1000.0)
+
+/** Occupied bandwidth, in MHz. */
+fun fmtBwMHz(hz: Long): String = String.format(java.util.Locale.US, "%.2f MHz", hz / 1e6)
 

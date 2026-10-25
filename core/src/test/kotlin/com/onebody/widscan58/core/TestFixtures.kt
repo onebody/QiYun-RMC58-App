@@ -67,6 +67,7 @@ internal class MetricChannel(
     val rssiEma: Double? = null,
     val floor: Double? = null,
     val snr: Double? = null,
+    val clearFloor: Double? = null,
     val peak: Double? = null,
     val centroidHz: Long? = null,
     val obwHz: LongRange? = null,
@@ -95,9 +96,11 @@ internal fun metricsOf(
         p[o] = c.id.toByte()
         p[o + 1] = c.flags.toByte()
         i16(o + 2, c.rssi)
-        i16(o + 4, c.rssiEma)
+        // FULL metrics always smooths RSSI; an unmeasured clear floor is the wire's own sentinel.
+        i16(o + 4, c.rssiEma ?: c.rssi)
         i16(o + 6, c.floor)
         i16(o + 8, c.snr)
+        b.putShort(o + 10, (c.clearFloor?.let { (it * 100).roundToInt().toShort() } ?: Short.MIN_VALUE))
         i16(o + 12, c.peak)
         c.centroidHz?.let { b.putInt(o + 18, it.toInt()) }
         c.obwHz?.let { b.putShort(o + 22, (it.first / 1000).toShort()).putShort(o + 24, (it.last / 1000).toShort()) }
