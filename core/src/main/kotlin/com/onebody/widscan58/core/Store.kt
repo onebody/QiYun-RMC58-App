@@ -75,6 +75,17 @@ class Store(
     var spursKhz: List<Double> = emptyList()
         private set
 
+    /** The protocol console's ring: what the board said, what we asked it to do. */
+    val log = ArrayList<LogLine>()
+
+    /** A console line. The web caps the text as well as the ring, so a chatty
+     *  reply cannot push the useful lines out of sight. */
+    fun addLog(dir: LogDir, text: String) {
+        log += LogLine(now(), dir, if (text.length > LOG_TEXT_MAX) text.take(LOG_TEXT_MAX) + " …" else text)
+        if (log.size > LOG_MAX) log.removeAt(0)
+        touch()
+    }
+
     /** Changes with the profile or its channel plan; per-channel state is keyed by plan index. */
     var planKey = ""
         private set
@@ -122,22 +133,29 @@ class Store(
 
     fun ingest(item: StreamItem) {
         when (item) {
-            is StreamItem.Text -> ingestText(item.line)
+            is StreamItem.Text -> {
+                ingestText(item.line)
+                addLog(if (item.line.startsWith("ERR")) LogDir.ERROR else LogDir.RX, item.line)
+            }
+
             is StreamItem.Frame -> when (item.type) {
                 FrameType.METRICS -> onMetrics(parseMetrics(item.payload))
                 FrameType.LEVELS -> onMetrics(parseLevels(item.payload))
                 FrameType.SPECTRUM -> onSpectrum(parseSpectrum(item.payload))
                 FrameType.TELEMETRY -> telemetry = parseTelemetry(item.payload)
-                else -> Unit // raw IQ and device log lines have no view on the phone
+                // The firmware has never used this type, but the web prints it, so we do too.
+                FrameType.LOG -> addLog(LogDir.INFO, String(item.payload, Charsets.UTF_8).trim('\u0000', '\n', '\r'))
+                else -> Unit // raw IQ has no view outside the record file
             }
         }
         version++
     }
 
     private fun ingestText(line: String) {
+        fun badReply() = addLog(LogDir.ERROR, "bad ${line.substringBefore(' ')} reply; ignored")
         when {
-            line.startsWith("PROFILE ") -> codec.profile(line.substringAfter(' '))?.let(::setProfile)
-            line.startsWith("STATUS ") -> codec.status(line.substringAfter(' '))?.let(::setStatus)
+            line.startsWith("PROFILE ") -> codec.profile(line.substringAfter(' '))?.let(::setProfile) ?: badReply()
+            line.startsWith("STATUS ") -> codec.status(line.substringAfter(' '))?.let(::setStatus) ?: badReply()
             line.startsWith("INFO ") -> info = line.substring(5)
             line.startsWith("SPURS ") -> {
                 val f = line.split(' ')
@@ -194,6 +212,11 @@ class Store(
         private const val SEGMENT_TIMEOUT_S = 3.0
         /** The web keeps 400 hops and draws the last 300 of them. */
         const val HOP_HISTORY = 400
+        /** The web's console ring, and its per-line text cap. */
+        const val LOG_MAX = 500
+        private const val LOG_TEXT_MAX = 300
+        /** What the console shows: the web renders the same tail of the ring. */
+        const val LOG_SHOWN = 200
     }
 }
 

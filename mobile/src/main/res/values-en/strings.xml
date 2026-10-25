@@ -158,4 +158,9 @@
     <string name="hop_total">total</string>
     <string name="hop_clear">Clear crosshair</string>
     <string name="hop_hint">Drag across the chart to read one hop</string>
+
+    <string name="console_title">Protocol console</string>
+    <string name="console_hint">Command, e.g. TIMING?</string>
+    <string name="console_send">Send</string>
+    <string name="console_waiting">No link traffic yet</string>
 </resources>

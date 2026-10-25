@@ -160,4 +160,9 @@
     <string name="hop_total">合计</string>
     <string name="hop_clear">取消指针</string>
     <string name="hop_hint">在图上拖动查看单跳分解</string>
+
+    <string name="console_title">协议控制台</string>
+    <string name="console_hint">命令，例如 TIMING?</string>
+    <string name="console_send">发送</string>
+    <string name="console_waiting">还没有链路消息</string>
 </resources>

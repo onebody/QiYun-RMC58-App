@@ -25,6 +25,7 @@ import com.onebody.widscan58.core.DeviceCommands
 import com.onebody.widscan58.core.DropWindow
 import com.onebody.widscan58.core.GainMode
 import com.onebody.widscan58.core.LinkRate
+import com.onebody.widscan58.core.LogDir
 import com.onebody.widscan58.core.Scheduler
 import com.onebody.widscan58.core.StreamItem
 import com.onebody.widscan58.core.StreamParser
@@ -73,6 +74,7 @@ class Widscan58Activity : Activity() {
     private var sheet: SettingsSheet? = null
     private var history: HistorySheet? = null
     private var telemetry: TelemetrySheet? = null
+    private var console: ConsoleSheet? = null
 
     /** The web card derives these from the counters, and does it whether or not it is on screen. */
     private val linkRate = LinkRate()
@@ -201,6 +203,7 @@ class Widscan58Activity : Activity() {
         zoom?.dismiss()
         history?.dismiss()
         telemetry?.dismiss()
+        console?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
         sim?.stop()
@@ -255,6 +258,7 @@ class Widscan58Activity : Activity() {
         zoom?.update()
         history?.update()
         telemetry?.update(linkCounters())
+        console?.update()
         statusLine.text = status()
     }
 
@@ -343,16 +347,24 @@ class Widscan58Activity : Activity() {
         menu.menu.add(0, MENU_SCALE, 0, R.string.auto_scale)
         menu.menu.add(0, MENU_HISTORY, 0, R.string.history_title)
         menu.menu.add(0, MENU_TELEMETRY, 0, R.string.telemetry_title)
+        menu.menu.add(0, MENU_CONSOLE, 0, R.string.console_title)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_SCALE -> panorama.autoScale()
                 MENU_HISTORY -> openHistory()
                 MENU_TELEMETRY -> openTelemetry()
+                MENU_CONSOLE -> openConsole()
                 else -> return@setOnMenuItemClickListener false
             }
             true
         }
         menu.show()
+    }
+
+    /** The wire in both directions, which is the only way to see what the board really said. */
+    private fun openConsole() {
+        console?.dismiss()
+        console = ConsoleSheet(this, store, ::applySetting).also { it.show() }
     }
 
     /** The numbers the board reports about itself, which the instrument layout has no room for. */
@@ -383,7 +395,9 @@ class Widscan58Activity : Activity() {
     /** One write, then the reply that lets the form show the device's state instead of our request. */
     private fun applySetting(line: String) {
         command(line)
-        if (line != DeviceCommands.REBOOT && line != DeviceCommands.BOOTLOADER) command("STATUS?")
+        // A query already answers for itself; only a change needs the status read back.
+        val answers = line.endsWith("?") || line == DeviceCommands.REBOOT || line == DeviceCommands.BOOTLOADER
+        if (!answers) command("STATUS?")
         refresh()
     }
 
@@ -419,6 +433,7 @@ class Widscan58Activity : Activity() {
         opened.onClose = { why -> main.post { closeLink(why) } }
         lastFrameMs = SystemClock.elapsedRealtime()
         note = ""
+        store.addLog(LogDir.INFO, "connected via usb")
         // The firmware boots silent in RotorHazard mode; ask for our stream first.
         command("PROTOCOL MONITOR") { handshake() }
     }
@@ -460,14 +475,17 @@ class Widscan58Activity : Activity() {
         l.onClose = null
         l.close()
         note = getString(R.string.note_disconnected, why)
+        store.addLog(LogDir.INFO, "connection closed: $why")
     }
 
     private fun command(line: String, reply: (CommandResult) -> Unit = {}) {
+        store.addLog(LogDir.TX, line)
         sim?.let {
             it.onCommand(line)
             return
         }
         val r = runner ?: run {
+            store.addLog(LogDir.ERROR, "not connected: $line")
             note = getString(R.string.note_not_connected, line)
             return
         }
@@ -518,6 +536,7 @@ class Widscan58Activity : Activity() {
         private const val MENU_SCALE = 1
         private const val MENU_HISTORY = 2
         private const val MENU_TELEMETRY = 3
+        private const val MENU_CONSOLE = 4
         private val TILE_IDS = intArrayOf(
             R.id.tile0, R.id.tile1, R.id.tile2, R.id.tile3, R.id.tile4, R.id.tile5, R.id.tile6, R.id.tile7,
         )

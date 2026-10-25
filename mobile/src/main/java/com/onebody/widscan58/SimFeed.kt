@@ -80,6 +80,7 @@ class SimFeed(
         val verb = p.firstOrNull()
         val word = p.getOrNull(1)
         var republish = true
+        var known = true
         when (verb) {
             "SCAN" -> running = word == "START"
             "MODE" -> if (word == "GROUP" || word == "SINGLE") cfg.mode = word else republish = false
@@ -129,9 +130,28 @@ class SimFeed(
                     cfg.enabled = (1 shl names.size) - 1
                 }
             }
-            else -> republish = false
+            else -> {
+                known = false
+                republish = false
+            }
         }
         if (republish) publish()
+        reply(line, known)
+    }
+
+    /** What the board's `handle()` would put back on the wire for this command. */
+    private fun reply(line: String, known: Boolean) {
+        val text = when (line.substringBefore(' ')) {
+            "INFO" -> "INFO widscan58|esp32-c5|1|0.0.0-sim|0000000|sim"
+            "GAIN?" -> "GAIN ${cfg.gainMode} ${cfg.gain} 0 ${cfg.gainMax}"
+            "SPURS?" -> "SPURS 0 guard 0"
+            "TIMING?" -> "TIMING psd 900 (prep 210 fft 520 power 170) metrics 260 spectrum 180"
+            // STATUS? and CONFIG? are the JSON the sim already applies directly; a
+            // hand-written copy would only be a worse version of it.
+            "STATUS?", "CONFIG?", "PROFILE?" -> return
+            else -> if (known) "OK" else "ERR command"
+        }
+        store.ingest(StreamItem.Text(text))
     }
 
     // ---- what the radio sees ----

@@ -164,6 +164,41 @@ class StoreTest {
     }
 
     @Test
+    fun `the console ring keeps what the link said`() {
+        val s = store()
+        s.addLog(LogDir.TX, "GAIN MANUAL 45")
+        s.ingest(StreamItem.Text("OK"))
+        s.ingest(StreamItem.Text("ERR rh_mode"))
+        s.ingest(frame(FrameType.LOG, "REGDIFF t=1234 lo=5658000".toByteArray()))
+        assertEquals(
+            listOf("> GAIN MANUAL 45", "< OK", "< ERR rh_mode", "< REGDIFF t=1234 lo=5658000"),
+            s.log.map { it.dir.arrow + " " + it.text },
+        )
+        assertEquals(listOf(LogDir.TX, LogDir.RX, LogDir.ERROR, LogDir.INFO), s.log.map { it.dir })
+    }
+
+    @Test
+    fun `an undecodable reply is an error line as well as a dropped state`() {
+        val s = store()
+        s.ingest(StreamItem.Text("PROFILE {\"name\":\"x\"}"))
+        assertEquals(
+            listOf("bad PROFILE reply; ignored", "PROFILE {\"name\":\"x\"}"),
+            s.log.map { it.text },
+        )
+        assertEquals(listOf(LogDir.ERROR, LogDir.RX), s.log.map { it.dir })
+    }
+
+    @Test
+    fun `the console ring drops its oldest line and caps one line's text`() {
+        val s = store()
+        for (j in 0 until Store.LOG_MAX + 20) s.addLog(LogDir.RX, "line $j")
+        assertEquals(Store.LOG_MAX, s.log.size)
+        assertEquals("line 20", s.log.first().text)
+        s.addLog(LogDir.RX, "x".repeat(320))
+        assertEquals("a long reply is cut with the web's ellipsis", 302, s.log.last().text.length)
+    }
+
+    @Test
     fun `series keep the newest points and iterate oldest first`() {
         val s = Series(4)
         for (j in 0 until 6) s.push(j.toDouble(), j.toFloat())
