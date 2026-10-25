@@ -165,4 +165,20 @@
     <string name="console_hint">命令，例如 TIMING?</string>
     <string name="console_send">发送</string>
     <string name="console_waiting">还没有链路消息</string>
+
+    <string name="gpio_title">GPIO 配置</string>
+    <string name="gpio_intro">设备启动时设为输出的引脚，拉低或拉高，例如天线切换开关。修改会立即生效。</string>
+    <string name="gpio_pin">GPIO %1$d</string>
+    <string name="gpio_unused">不使用</string>
+    <string name="gpio_low">低</string>
+    <string name="gpio_high">高</string>
+    <string name="gpio_reserved">Flash / USB</string>
+    <string name="gpio_reserved_word">保留</string>
+    <string name="gpio_saved">已保存：%1$s</string>
+    <string name="gpio_unsaved">未保存的修改：现在已生效，但设备重启后会回到已保存的设置。点「保存」才会保留。</string>
+    <string name="gpio_save">保存</string>
+    <string name="gpio_save_hint">把当前设置写为开机默认</string>
+    <string name="gpio_revert">还原</string>
+    <string name="gpio_revert_hint">恢复到已保存的设置</string>
+    <string name="gpio_none">还没有 GPIO 信息：这条固件可能没有 GPIO 配置。</string>
 </resources>

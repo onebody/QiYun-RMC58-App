@@ -149,6 +149,7 @@ class StoreTest {
         val codec = object : ReplyCodec {
             override fun profile(json: String): Profile? = if (json.contains("narrow")) profileOf(channel(0)) else null
             override fun status(json: String): Status? = if (json.contains("narrow")) statusOf(5_658_000) else null
+            override fun gpio(json: String): List<GpioPin>? = if (json.contains("narrow")) parseGpio(1, "-", "L") else null
         }
         val s = store(codec)
         s.ingest(StreamItem.Text("INFO widscan58|c5-race|1|0.9.0|2026-10-19|1"))
@@ -159,6 +160,8 @@ class StoreTest {
         assertEquals(1, s.channels.size)
         s.ingest(StreamItem.Text("STATUS {\"name\":\"narrow\"}"))
         assertNotNull(s.status)
+        s.ingest(StreamItem.Text("GPIO {\"name\":\"narrow\"}"))
+        assertEquals(GpioSetting.LOW, s.gpio.single().saved)
         s.ingest(StreamItem.Text("PROFILE {\"name\":\"other\"}"))
         assertEquals("an undecodable reply leaves the state alone", 1, s.channels.size)
     }

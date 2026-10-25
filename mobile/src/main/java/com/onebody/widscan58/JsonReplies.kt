@@ -1,13 +1,15 @@
-// PROFILE and STATUS replies are JSON; this is the bridge to the pure-Kotlin model.
+// PROFILE, STATUS and GPIO replies are JSON; this is the bridge to the pure-Kotlin model.
 // GPL-3.0-or-later.
 package com.onebody.widscan58
 
+import com.onebody.widscan58.core.GpioPin
 import com.onebody.widscan58.core.MetricsMode
 import com.onebody.widscan58.core.PlanHop
 import com.onebody.widscan58.core.Profile
 import com.onebody.widscan58.core.ProfileChannel
 import com.onebody.widscan58.core.ReplyCodec
 import com.onebody.widscan58.core.Status
+import com.onebody.widscan58.core.parseGpio
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -86,5 +88,11 @@ class JsonReplies : ReplyCodec {
                 PlanHop(h.optLong("lo_khz"), IntArray(ch.length()) { k -> ch.getInt(k) }, off.longs())
             },
         )
+    }.getOrNull()
+
+    /** The pin settings are one character each, so the strict shape check belongs to :core. */
+    override fun gpio(json: String): List<GpioPin>? = runCatching {
+        val o = JSONObject(json)
+        parseGpio(o.getInt("count"), o.getString("active"), o.getString("saved"))
     }.getOrNull()
 }

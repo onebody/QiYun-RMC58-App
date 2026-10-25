@@ -10,12 +10,16 @@ interface ReplyCodec {
     fun profile(json: String): Profile?
 
     fun status(json: String): Status?
+
+    fun gpio(json: String): List<GpioPin>?
 }
 
 object NoReplies : ReplyCodec {
     override fun profile(json: String): Profile? = null
 
     override fun status(json: String): Status? = null
+
+    override fun gpio(json: String): List<GpioPin>? = null
 }
 
 class ChannelState(capacity: Int) {
@@ -73,6 +77,10 @@ class Store(
     /** Per-bin noise floor (dBFS) measured at each LO. */
     val floorByLo = LinkedHashMap<Long, Double>()
     var spursKhz: List<Double> = emptyList()
+        private set
+
+    /** The board's boot-time output pins, as the last GPIO? answered them. */
+    var gpio: List<GpioPin> = emptyList()
         private set
 
     /** The protocol console's ring: what the board said, what we asked it to do. */
@@ -156,6 +164,7 @@ class Store(
         when {
             line.startsWith("PROFILE ") -> codec.profile(line.substringAfter(' '))?.let(::setProfile) ?: badReply()
             line.startsWith("STATUS ") -> codec.status(line.substringAfter(' '))?.let(::setStatus) ?: badReply()
+            line.startsWith("GPIO ") -> codec.gpio(line.substringAfter(' '))?.let { gpio = it } ?: badReply()
             line.startsWith("INFO ") -> info = line.substring(5)
             line.startsWith("SPURS ") -> {
                 val f = line.split(' ')

@@ -163,4 +163,20 @@
     <string name="console_hint">Command, e.g. TIMING?</string>
     <string name="console_send">Send</string>
     <string name="console_waiting">No link traffic yet</string>
+
+    <string name="gpio_title">GPIO configuration</string>
+    <string name="gpio_intro">Pins the device sets as outputs when it starts, low or high, such as an antenna switch. A change takes effect immediately.</string>
+    <string name="gpio_pin">GPIO %1$d</string>
+    <string name="gpio_unused">Not used</string>
+    <string name="gpio_low">Low</string>
+    <string name="gpio_high">High</string>
+    <string name="gpio_reserved">Flash / USB</string>
+    <string name="gpio_reserved_word">Reserved</string>
+    <string name="gpio_saved">saved: %1$s</string>
+    <string name="gpio_unsaved">Unsaved changes: in effect now, but the device goes back to its saved settings when it restarts. Save to keep them.</string>
+    <string name="gpio_save">Save</string>
+    <string name="gpio_save_hint">Make the current settings the ones the device starts with</string>
+    <string name="gpio_revert">Revert</string>
+    <string name="gpio_revert_hint">Put the saved settings back in effect</string>
+    <string name="gpio_none">No GPIO settings yet: this firmware may not have them.</string>
 </resources>

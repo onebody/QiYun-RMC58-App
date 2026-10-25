@@ -19,6 +19,7 @@ import com.onebody.widscan58.core.ProfileChannel
 import com.onebody.widscan58.core.Status
 import com.onebody.widscan58.core.Store
 import com.onebody.widscan58.core.StreamItem
+import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.exp
@@ -53,6 +54,13 @@ class SimFeed(
     var running = true
         private set
     val gain: Int get() = cfg.gain
+
+    /** GPIO? reports one character per pin, in pin order: '-' unused, 'L', 'H', 'x' flash or USB. */
+    private val gpioActive = CharArray(GPIO_PINS) { if (it in GPIO_RESERVED) 'x' else '-' }
+    private var gpioSaved = gpioActive.copyOf()
+
+    /** The last rejected GPIO write, in the firmware's own words. */
+    private var gpioError: String? = null
 
     private val step = object : Runnable {
         override fun run() {
@@ -121,6 +129,19 @@ class SimFeed(
             "CONJ" -> cfg.conjugate = if (word == "1") 1 else 0
             "IQCORR" -> cfg.iqCorr = if (word == "1") 1 else 0
             "ENABLE" -> word?.toIntOrNull()?.let { cfg.enabled = it and 0xff }
+            "GPIO?" -> republish = false
+            "GPIO" -> {
+                republish = false
+                val pin = word?.toIntOrNull()
+                val state = p.getOrNull(2)?.let { GPIO_STATE[it] }
+                when {
+                    pin == null && word == "SAVE" -> gpioSaved = gpioActive.copyOf()
+                    pin == null -> known = false
+                    state == null -> gpioError = "gpio_state"
+                    pin >= gpioActive.size || gpioActive[pin] == 'x' -> gpioError = "gpio_pin"
+                    else -> gpioActive[pin] = state
+                }
+            }
             "CHANNELS" -> {
                 val names = Bands.normalize(p.drop(1).map { it.substringBefore('=') })
                 if (names.isNotEmpty()) {
@@ -141,17 +162,29 @@ class SimFeed(
 
     /** What the board's `handle()` would put back on the wire for this command. */
     private fun reply(line: String, known: Boolean) {
-        val text = when (line.substringBefore(' ')) {
+        val refused = gpioError
+        gpioError = null
+        val text = refused ?: when (line.substringBefore(' ')) {
             "INFO" -> "INFO widscan58|esp32-c5|1|0.0.0-sim|0000000|sim"
             "GAIN?" -> "GAIN ${cfg.gainMode} ${cfg.gain} 0 ${cfg.gainMax}"
             "SPURS?" -> "SPURS 0 guard 0"
             "TIMING?" -> "TIMING psd 900 (prep 210 fft 520 power 170) metrics 260 spectrum 180"
+            "GPIO?" -> gpioReply()
             // STATUS? and CONFIG? are the JSON the sim already applies directly; a
             // hand-written copy would only be a worse version of it.
             "STATUS?", "CONFIG?", "PROFILE?" -> return
             else -> if (known) "OK" else "ERR command"
         }
         store.ingest(StreamItem.Text(text))
+    }
+
+    /** The same shape as the firmware's send_gpio(): the pin count and one character each. */
+    private fun gpioReply(): String {
+        val o = JSONObject()
+            .put("count", gpioActive.size)
+            .put("active", String(gpioActive))
+            .put("saved", String(gpioSaved))
+        return "GPIO $o"
     }
 
     // ---- what the radio sees ----
@@ -335,6 +368,11 @@ class SimFeed(
         private const val HOP_MS = 130L
         private const val TELEMETRY_EVERY = 4
         private const val FILTER_MAX = 63
+
+        /** The C5 has GPIO0-28; the USB and flash pins are the firmware's to keep. */
+        private const val GPIO_PINS = 29
+        private val GPIO_RESERVED = intArrayOf(13, 14, 16, 17, 18, 20, 21, 22)
+        private val GPIO_STATE = mapOf("NONE" to '-', "LOW" to 'L', "HIGH" to 'H')
 
         private fun window(hz: Long?) = (hz ?: 5_000_000L).coerceIn(10_000, 20_000_000)
 

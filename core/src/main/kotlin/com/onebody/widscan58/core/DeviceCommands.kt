@@ -52,6 +52,9 @@ object DeviceCommands {
 
     fun metrics(mode: MetricsMode) = "METRICS ${mode.name}"
 
+    /** Drives a pin now; `GPIO SAVE` is what makes it the boot setting. */
+    fun gpioPin(pin: Int, setting: GpioSetting) = "GPIO $pin ${setting.name}"
+
     /** Both windows are the device's own ± Hz; the web UI's inputs are kHz. */
     fun windows(rssiHz: Long, searchHz: Long) =
         "WIN ${windowHz(rssiHz)} ${windowHz(searchHz)}"

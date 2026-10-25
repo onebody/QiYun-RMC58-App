@@ -75,6 +75,7 @@ class Widscan58Activity : Activity() {
     private var history: HistorySheet? = null
     private var telemetry: TelemetrySheet? = null
     private var console: ConsoleSheet? = null
+    private var gpio: GpioSheet? = null
 
     /** The web card derives these from the counters, and does it whether or not it is on screen. */
     private val linkRate = LinkRate()
@@ -204,6 +205,7 @@ class Widscan58Activity : Activity() {
         history?.dismiss()
         telemetry?.dismiss()
         console?.dismiss()
+        gpio?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
         sim?.stop()
@@ -259,6 +261,7 @@ class Widscan58Activity : Activity() {
         history?.update()
         telemetry?.update(linkCounters())
         console?.update()
+        gpio?.update()
         statusLine.text = status()
     }
 
@@ -348,12 +351,14 @@ class Widscan58Activity : Activity() {
         menu.menu.add(0, MENU_HISTORY, 0, R.string.history_title)
         menu.menu.add(0, MENU_TELEMETRY, 0, R.string.telemetry_title)
         menu.menu.add(0, MENU_CONSOLE, 0, R.string.console_title)
+        menu.menu.add(0, MENU_GPIO, 0, R.string.gpio_title)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_SCALE -> panorama.autoScale()
                 MENU_HISTORY -> openHistory()
                 MENU_TELEMETRY -> openTelemetry()
                 MENU_CONSOLE -> openConsole()
+                MENU_GPIO -> openGpio()
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -371,6 +376,17 @@ class Widscan58Activity : Activity() {
     private fun openTelemetry() {
         telemetry?.dismiss()
         telemetry = TelemetrySheet(this, store).also { it.show() }
+    }
+
+    /** Which pins the board drives at start-up — only a board can say. */
+    private fun openGpio() {
+        if (link == null && sim == null) {
+            note = getString(R.string.plug_in)
+            refresh()
+            return
+        }
+        gpio?.dismiss()
+        gpio = GpioSheet(this, store, ::applyGpio).also { it.show() }
     }
 
     /** KiB/s and dropped frames are rates off counters, so they need sampling between the panels. */
@@ -398,6 +414,12 @@ class Widscan58Activity : Activity() {
         // A query already answers for itself; only a change needs the status read back.
         val answers = line.endsWith("?") || line == DeviceCommands.REBOOT || line == DeviceCommands.BOOTLOADER
         if (!answers) command("STATUS?")
+        refresh()
+    }
+
+    /** The GPIO sheet reads its own state back, so a write needs no STATUS? alongside it. */
+    private fun applyGpio(line: String) {
+        command(line)
         refresh()
     }
 
@@ -537,6 +559,7 @@ class Widscan58Activity : Activity() {
         private const val MENU_HISTORY = 2
         private const val MENU_TELEMETRY = 3
         private const val MENU_CONSOLE = 4
+        private const val MENU_GPIO = 5
         private val TILE_IDS = intArrayOf(
             R.id.tile0, R.id.tile1, R.id.tile2, R.id.tile3, R.id.tile4, R.id.tile5, R.id.tile6, R.id.tile7,
         )
