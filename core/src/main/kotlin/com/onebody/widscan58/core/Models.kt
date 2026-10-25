@@ -170,8 +170,9 @@ class Status(
     val rssiHz: Long,
     val searchHz: Long,
     val dcGuard: Int,
-    val ema: Int,
-    val clearEma: Int,
+    // STATUS reports the smoothing factors as fractions; the EMA command takes thousandths.
+    val ema: Double,
+    val clearEma: Double,
     val signalDb: Double,
     val avgShift: Int,
     val specEvery: Int,
