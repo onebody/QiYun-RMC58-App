@@ -3,6 +3,7 @@
 // Mirrors web/src/model/store.ts. GPL-3.0-or-later.
 package com.onebody.widscan58.core
 
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.pow
 
 /** PROFILE/STATUS answers carry JSON, which only the platform layer can parse. */
@@ -83,8 +84,9 @@ class Store(
     var gpio: List<GpioPin> = emptyList()
         private set
 
-    /** The protocol console's ring: what the board said, what we asked it to do. */
-    val log = ArrayList<LogLine>()
+    /** The protocol console's ring: what the board said, what we asked it to do. The RH poller
+     *  appends to it while the screen walks it, hence the snapshot-iterator list. */
+    val log = CopyOnWriteArrayList<LogLine>()
 
     /** A console line. The web caps the text as well as the ring, so a chatty
      *  reply cannot push the useful lines out of sight. */

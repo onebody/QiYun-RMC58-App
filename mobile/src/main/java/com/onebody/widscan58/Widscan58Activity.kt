@@ -28,6 +28,10 @@ import com.onebody.widscan58.core.DropWindow
 import com.onebody.widscan58.core.GainMode
 import com.onebody.widscan58.core.LinkRate
 import com.onebody.widscan58.core.LogDir
+import com.onebody.widscan58.core.RhLink
+import com.onebody.widscan58.core.RhLinkError
+import com.onebody.widscan58.core.RhSerialLink
+import com.onebody.widscan58.core.RhSimLink
 import com.onebody.widscan58.core.Scheduler
 import com.onebody.widscan58.core.SessionRecorder
 import com.onebody.widscan58.core.StreamItem
@@ -91,6 +95,11 @@ class Widscan58Activity : Activity() {
     private var console: ConsoleSheet? = null
     private var gpio: GpioSheet? = null
     private var session: SessionSheet? = null
+
+    /** The RotorHazard session, if the board is in that mode: while it runs, it owns the wire. */
+    private var rh: RhFeed? = null
+    private var rhVoice: VoiceOut? = null
+    private var rhSheet: RhSheet? = null
 
     /** The web card derives these from the counters, and does it whether or not it is on screen. */
     private val linkRate = LinkRate()
@@ -199,6 +208,8 @@ class Widscan58Activity : Activity() {
             // The same restore a board gets, so the sim comes up in the stored state.
             handshake()
         }
+        // …and `--ez rh true` runs a RotorHazard board with no hardware behind it.
+        if (intent.getBooleanExtra("rh", false)) startRh(RhSimLink({ SystemClock.elapsedRealtime() }, JsonWrites::rhConfig))
     }
 
     override fun onResume() {
@@ -207,6 +218,7 @@ class Widscan58Activity : Activity() {
         main.postDelayed(watchdog, WATCHDOG_PERIOD_MS)
         feed.resume()
         if (showSim) sim?.start()
+        rh?.resume()
         if (link == null) findBoard(usbManager())?.let(::requestAndOpen)
     }
 
@@ -226,11 +238,22 @@ class Widscan58Activity : Activity() {
         console?.dismiss()
         gpio?.dismiss()
         session?.dismiss()
+        rhSheet?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
         feed.pause()
         sim?.stop()
         closeLink(getString(R.string.note_paused))
+        // A board's session went with that port; the simulator keeps its link, so its cycle has to be
+        // stopped here or it polls, and calls laps, from the background.
+        rh?.pause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        endRh()
+        rhVoice?.release()
+        rhVoice = null
     }
 
     // ---- drawing: one coalesced refresh per frame, only when the data changed ----
@@ -284,6 +307,7 @@ class Widscan58Activity : Activity() {
         console?.update()
         gpio?.update()
         session?.update()
+        rhSheet?.update()
         statusLine.text = status()
     }
 
@@ -299,6 +323,8 @@ class Widscan58Activity : Activity() {
             sim != null -> parts.add(getString(R.string.status_sim))
             else -> return note.ifEmpty { getString(R.string.plug_in) }
         }
+        // The board is answering a different protocol than the instrument's own frames.
+        if (rh != null) return (parts + getString(R.string.rh_title)).joinToString(" · ")
         parts.add(store.profile?.name ?: getString(R.string.status_connecting))
         store.telemetry?.let { parts.add(getString(R.string.status_rot, it.rotationHz)) }
         store.status?.let { parts.add(getString(R.string.status_hops, it.plan.size)) }
@@ -376,6 +402,7 @@ class Widscan58Activity : Activity() {
         menu.menu.add(0, MENU_CONSOLE, 0, R.string.console_title)
         menu.menu.add(0, MENU_GPIO, 0, R.string.gpio_title)
         menu.menu.add(0, MENU_SESSION, 0, R.string.session_title)
+        menu.menu.add(0, MENU_RH, 0, R.string.rh_title)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 MENU_SCALE -> panorama.autoScale()
@@ -384,6 +411,7 @@ class Widscan58Activity : Activity() {
                 MENU_CONSOLE -> openConsole()
                 MENU_GPIO -> openGpio()
                 MENU_SESSION -> openSession()
+                MENU_RH -> openRh()
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -601,6 +629,86 @@ class Widscan58Activity : Activity() {
         refresh()
     }
 
+    // ---- RotorHazard mode ----
+
+    /**
+     * Ask the board to switch, then hand the port over. Only a board can be asked: the line that
+     * leaves monitor mode is the one thing our monitor simulator has no reason to answer.
+     */
+    private fun openRh() {
+        if (rh != null) {
+            rhSheet?.show()
+            return
+        }
+        val l = link
+        if (feed.started || l == null || sim != null) {
+            note = getString(if (feed.started) R.string.note_replay_readonly else R.string.rh_need_board)
+            refresh()
+            return
+        }
+        command("SCAN STOP")
+        command("PROTOCOL RH") { result ->
+            if (result is CommandResult.Failed) {
+                note = result.why
+                refresh()
+                return@command
+            }
+            // From here the wire answers a different protocol: nothing may be left waiting for a reply.
+            runner?.failAll("RotorHazard mode")
+            startRh(RhSerialLink({ SystemClock.elapsedRealtime() }) { bytes ->
+                if (!l.write(bytes)) throw RhLinkError("usb write failed")
+            })
+        }
+        note = getString(R.string.rh_entering)
+        refresh()
+    }
+
+    /** The poll loop starts here; the sheet is the only thing that reads what it finds. */
+    private fun startRh(source: RhLink) {
+        val voice = rhVoice ?: VoiceOut(this, prefs).also { rhVoice = it }
+        val session = RhFeed(prefs, store, source, main)
+        rh = session
+        session.model.onLap = { seat, lapS ->
+            val channel = seat.channel
+            if (channel != null) main.post { voice.speak(lapCallout(channel, lapS)) }
+        }
+        session.start(planNames())
+        rhSheet?.dismiss()
+        rhSheet = RhSheet(this, prefs, session, voice, ::leaveRh).also { it.show() }
+        note = ""
+        refresh()
+    }
+
+    /** Leave on the board's own terms: the line goes out while the port is still ours to write. */
+    private fun leaveRh() {
+        val r = rh ?: return
+        rhSheet?.dismiss()
+        rhSheet = null
+        rh = null
+        note = ""
+        refresh()
+        r.leave {
+            // The board is listening to our stream again: the instrument starts from the handshake.
+            parser = StreamParser()
+            lastFrameMs = SystemClock.elapsedRealtime()
+            // Only a real port has a monitor mode to come back to; the simulator just ends the session.
+            if (link != null) {
+                note = getString(R.string.rh_left_monitor)
+                handshake()
+            }
+            refresh()
+        }
+    }
+
+    /** The port went away under us: stop polling without trying to talk to the board again. */
+    private fun endRh() {
+        rhSheet?.dismiss()
+        rhSheet = null
+        val r = rh ?: return
+        rh = null
+        r.abandon()
+    }
+
     // ---- link ----
 
     private fun usbManager() = getSystemService(UsbManager::class.java)!!
@@ -647,6 +755,13 @@ class Widscan58Activity : Activity() {
 
     /** Bytes arrive on the reader thread, or on the main one from a replay; state changes go to the UI. */
     private fun feedBytes(chunk: ByteArray) {
+        val r = rh
+        if (r != null) {
+            // In RotorHazard mode these are the node's answers, not our frames, and the wire is not
+            // a spectrum stream worth recording.
+            r.push(chunk)
+            return
+        }
         recorder.add(chunk)
         val items = parser?.push(chunk) ?: return
         if (items.isEmpty()) return
@@ -663,6 +778,8 @@ class Widscan58Activity : Activity() {
     private fun closeLink(why: String) {
         val l = link ?: return
         link = null
+        // The session writes to this port, so it goes before the port does.
+        endRh()
         parser = null
         runner?.failAll("link closed")
         runner = null
@@ -677,6 +794,11 @@ class Widscan58Activity : Activity() {
         if (feed.started) {
             note = getString(R.string.note_replay_readonly)
             refresh()
+            return
+        }
+        if (rh != null) {
+            // The board is not listening to the monitor protocol; its own sheet sends what it needs.
+            store.addLog(LogDir.ERROR, "RotorHazard mode: $line")
             return
         }
         store.addLog(LogDir.TX, line)
@@ -698,7 +820,9 @@ class Widscan58Activity : Activity() {
     /** Telemetry arrives at 4 Hz even when stopped, so a quiet link means the board restarted. */
     private val watchdog = object : Runnable {
         override fun run() {
-            if (link != null && SystemClock.elapsedRealtime() - lastFrameMs > NO_DATA_MS) {
+            // A RotorHazard session answers its own reads, so no monitor frame is due and silence
+            // is not evidence the board restarted.
+            if (link != null && rh == null && SystemClock.elapsedRealtime() - lastFrameMs > NO_DATA_MS) {
                 lastFrameMs = SystemClock.elapsedRealtime()
                 note = getString(R.string.note_no_data)
                 command("PROTOCOL MONITOR") { handshake() }
@@ -739,6 +863,7 @@ class Widscan58Activity : Activity() {
         private const val MENU_CONSOLE = 4
         private const val MENU_GPIO = 5
         private const val MENU_SESSION = 6
+        private const val MENU_RH = 7
         private const val REQ_SAVE_SESSION = 20
         private const val REQ_SAVE_CHANNELS = 21
         private const val REQ_SAVE_SPECTRUM = 22

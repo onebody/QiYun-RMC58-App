@@ -202,4 +202,79 @@
     <string name="note_save_failed">Saving %1$s failed: %2$s</string>
     <string name="note_replay_empty">That file holds no complete record</string>
     <string name="note_replay_failed">Reading %1$s failed: %2$s</string>
+
+    <string name="rh_title">Lap timing (RotorHazard)</string>
+    <string name="rh_tab_seats">Seats</string>
+    <string name="rh_tab_levels">Levels</string>
+    <string name="rh_tab_events">Events</string>
+    <string name="rh_tab_receiver">Receiver</string>
+    <string name="rh_plan">Channel plan</string>
+    <string name="rh_exit_mode">Leave lap timing</string>
+    <string name="rh_status_seats">%1$d seat(s) on · poll cycle %2$d ms</string>
+    <string name="rh_status_updates">%1$d seat(s) on · poll cycle %2$d ms · %3$d updates/s per seat</string>
+    <string name="rh_status_error">error: %1$s</string>
+    <string name="rh_status_not_polling">not polling</string>
+
+    <string name="rh_seat">Seat %1$d</string>
+    <string name="rh_off">off</string>
+    <string name="rh_unit_dbfs">dBFS</string>
+    <string name="rh_unit_snr">dB</string>
+    <string name="rh_enter">Enter</string>
+    <string name="rh_exit_at">Exit</string>
+    <string name="rh_now">now</string>
+    <string name="rh_laps">laps %1$d</string>
+    <string name="rh_last_lap">last lap %1$s</string>
+    <string name="rh_fastest">fastest %1$d %2$s</string>
+    <string name="rh_pass_peak">pass peak %1$s</string>
+    <string name="rh_peak_nadir">peak / nadir %1$s</string>
+
+    <string name="rh_span">%1$d s</string>
+    <string name="rh_selected_hint">selected seat: EnterAt / ExitAt and passes</string>
+    <string name="rh_no_seats">no seats are on yet</string>
+    <string name="rh_axis_rssi">level (dBFS = code / 4 − 63.75)</string>
+    <string name="rh_axis_snr">level (dB = code / 4)</string>
+
+    <string name="rh_events_clear">Clear</string>
+    <string name="rh_show_crossings">Split Enter/Exit</string>
+    <string name="rh_show_fastest">Fastest consecutive</string>
+    <string name="rh_min_lap">Minimum lap time</string>
+    <string name="rh_min_lap_hint">Passes sooner than this after the last one are ignored</string>
+    <string name="rh_fastest_count">Fastest consecutive laps</string>
+    <string name="rh_fastest_count_hint">Each seat’s fastest run of this many laps</string>
+    <string name="rh_no_events">No passes yet</string>
+    <string name="rh_event_enter">enter · %1$s</string>
+    <string name="rh_event_exit">exit · %1$s</string>
+    <string name="rh_event_pass">pass · lap %1$s s</string>
+    <string name="rh_event_pass_first">pass</string>
+    <string name="rh_event_ignored">pass · ignored (%1$s s)</string>
+    <string name="rh_event_peak">peak %1$d</string>
+    <string name="rh_event_fastest">fastest %1$d · %2$s s</string>
+    <string name="rh_event_was">was %1$s s</string>
+    <string name="rh_voice">Announce laps</string>
+    <string name="rh_voice_test">Test</string>
+    <string name="rh_voice_volume">Volume</string>
+    <string name="rh_voice_rate">Rate</string>
+    <string name="rh_voice_pitch">Pitch</string>
+
+    <string name="rh_gain">RX gain (PHY table index)</string>
+    <string name="rh_mode">LO plan</string>
+    <string name="rh_mode_group">Grouped</string>
+    <string name="rh_mode_single">Per channel</string>
+    <string name="rh_metric">Output value</string>
+    <string name="rh_metric_rssi">RSSI</string>
+    <string name="rh_metric_snr">SNR</string>
+    <string name="rh_filter">Output filter</string>
+    <string name="rh_filter_median">Median</string>
+    <string name="rh_filter_ema">EMA</string>
+    <string name="rh_fft">FFT size</string>
+    <string name="rh_fft_option">%1$d-pt FFT (%2$d samples)</string>
+    <string name="rh_save_hint">Save these settings as default</string>
+    <string name="rh_save">Save</string>
+    <string name="rh_reset">Reset</string>
+    <string name="rh_link_stats">Link: %1$d reads, %2$d writes, %3$d failed reads</string>
+
+    <string name="rh_left_monitor">Left lap-timing mode</string>
+    <string name="rh_entering">Entering lap-timing mode…</string>
+    <string name="rh_start_failed">Could not enter lap-timing mode: %1$s</string>
+    <string name="rh_need_board">Lap timing needs a board: connect one, or start the RotorHazard simulator.</string>
 </resources>

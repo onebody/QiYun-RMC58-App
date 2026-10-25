@@ -204,4 +204,79 @@
     <string name="note_save_failed">保存 %1$s 失败：%2$s</string>
     <string name="note_replay_empty">这个文件里没有一条完整记录</string>
     <string name="note_replay_failed">读取 %1$s 失败：%2$s</string>
+
+    <string name="rh_title">计圈（RotorHazard）</string>
+    <string name="rh_tab_seats">座位</string>
+    <string name="rh_tab_levels">电平</string>
+    <string name="rh_tab_events">事件</string>
+    <string name="rh_tab_receiver">接收机</string>
+    <string name="rh_plan">频道计划</string>
+    <string name="rh_exit_mode">退出计圈</string>
+    <string name="rh_status_seats">%1$d 个座位工作中 · 轮询 %2$d ms</string>
+    <string name="rh_status_updates">%1$d 个座位工作中 · 轮询 %2$d ms · 每座 %3$d 次/秒</string>
+    <string name="rh_status_error">错误：%1$s</string>
+    <string name="rh_status_not_polling">未在轮询</string>
+
+    <string name="rh_seat">座位 %1$d</string>
+    <string name="rh_off">关闭</string>
+    <string name="rh_unit_dbfs">dBFS</string>
+    <string name="rh_unit_snr">dB</string>
+    <string name="rh_enter">进入</string>
+    <string name="rh_exit_at">脱离</string>
+    <string name="rh_now">取当前</string>
+    <string name="rh_laps">圈数 %1$d</string>
+    <string name="rh_last_lap">最近单圈 %1$s</string>
+    <string name="rh_fastest">最快 %1$d 圈 %2$s</string>
+    <string name="rh_pass_peak">过线峰值 %1$s</string>
+    <string name="rh_peak_nadir">峰/谷 %1$s</string>
+
+    <string name="rh_span">%1$d 秒</string>
+    <string name="rh_selected_hint">选中座位的进入/脱离门限与过线</string>
+    <string name="rh_no_seats">还没有座位开启</string>
+    <string name="rh_axis_rssi">电平（dBFS = 码值/4 − 63.75）</string>
+    <string name="rh_axis_snr">电平（dB = 码值/4）</string>
+
+    <string name="rh_events_clear">清空</string>
+    <string name="rh_show_crossings">分开显示进入/脱离</string>
+    <string name="rh_show_fastest">显示最快连续</string>
+    <string name="rh_min_lap">最短单圈</string>
+    <string name="rh_min_lap_hint">比这更早的过线会被忽略</string>
+    <string name="rh_fastest_count">最快连续圈数</string>
+    <string name="rh_fastest_count_hint">每个座位统计这么多圈的最快组合</string>
+    <string name="rh_no_events">还没有过线</string>
+    <string name="rh_event_enter">进入 · %1$s</string>
+    <string name="rh_event_exit">脱离 · %1$s</string>
+    <string name="rh_event_pass">过线 · 单圈 %1$s s</string>
+    <string name="rh_event_pass_first">过线</string>
+    <string name="rh_event_ignored">过线 · 忽略（%1$s s）</string>
+    <string name="rh_event_peak">峰值 %1$d</string>
+    <string name="rh_event_fastest">最快 %1$d 圈 · %2$s s</string>
+    <string name="rh_event_was">原 %1$s s</string>
+    <string name="rh_voice">播报单圈</string>
+    <string name="rh_voice_test">试听</string>
+    <string name="rh_voice_volume">音量</string>
+    <string name="rh_voice_rate">语速</string>
+    <string name="rh_voice_pitch">音调</string>
+
+    <string name="rh_gain">接收增益（PHY 表索引）</string>
+    <string name="rh_mode">本振方案</string>
+    <string name="rh_mode_group">分组</string>
+    <string name="rh_mode_single">逐通道</string>
+    <string name="rh_metric">输出量</string>
+    <string name="rh_metric_rssi">RSSI</string>
+    <string name="rh_metric_snr">SNR</string>
+    <string name="rh_filter">输出滤波</string>
+    <string name="rh_filter_median">中值</string>
+    <string name="rh_filter_ema">均值</string>
+    <string name="rh_fft">FFT 点数</string>
+    <string name="rh_fft_option">%1$d 点（%2$d 采样）</string>
+    <string name="rh_save_hint">把这些设置存为默认</string>
+    <string name="rh_save">存为默认</string>
+    <string name="rh_reset">恢复默认</string>
+    <string name="rh_link_stats">链路：%1$d 次读、%2$d 次写、%3$d 次读取失败</string>
+
+    <string name="rh_left_monitor">已退出计圈模式</string>
+    <string name="rh_entering">正在进入计圈模式…</string>
+    <string name="rh_start_failed">进入计圈模式失败：%1$s</string>
+    <string name="rh_need_board">模拟设备不能计圈：请连接板卡，或用 --ez rh true 启动模拟计圈。</string>
 </resources>

@@ -5,6 +5,14 @@
         android:name="android.hardware.usb.host"
         android:required="true" />
 
+    <!-- Without this, Android 11+ package visibility hides every text-to-speech engine from us
+         and the lap calls fail silently rather than loudly. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

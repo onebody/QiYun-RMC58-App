@@ -6,6 +6,7 @@ package com.onebody.widscan58
 
 import com.onebody.widscan58.core.PlanHop
 import com.onebody.widscan58.core.Profile
+import com.onebody.widscan58.core.RhConfig
 import com.onebody.widscan58.core.Status
 import com.onebody.widscan58.core.Store
 import org.json.JSONArray
@@ -69,6 +70,17 @@ object JsonWrites {
         .put("lo_khz", h.loKhz)
         .put("ch", JSONArray(h.ch.toList()))
         .put("offset_hz", JSONArray(h.offsetHz.toList()))
+
+    /** The simulator's CONFIG? body: the keys [JsonReplies.rhConfig] reads, named as the board names them. */
+    fun rhConfig(c: RhConfig): String = JSONObject().apply {
+        put("gain", c.gain)
+        put("gain_max", c.gainMax)
+        put("gain_mode", c.gainMode.name)
+        put("nfft", c.nfft)
+        put("mode", c.mode.name)
+        put("metrics", c.metric.name)
+        put("level_filter", c.levelFilter.name)
+    }.toString()
 
     /** What a recording starts with, in the order the board sent it. */
     fun sessionPreamble(store: Store): List<String> = buildList {

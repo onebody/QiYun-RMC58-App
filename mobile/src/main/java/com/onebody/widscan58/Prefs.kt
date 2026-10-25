@@ -8,8 +8,16 @@ import com.onebody.widscan58.core.DeviceCommands
 import com.onebody.widscan58.core.DeviceSettings
 import com.onebody.widscan58.core.GainMode
 import com.onebody.widscan58.core.LoPlan
+import com.onebody.widscan58.core.RH_DEFAULT_ENTER
+import com.onebody.widscan58.core.RH_DEFAULT_EXIT
+import com.onebody.widscan58.core.RH_SEATS
+import com.onebody.widscan58.core.RhLapRules
+import com.onebody.widscan58.core.RhSaved
+import com.onebody.widscan58.core.RhSettings
+import kotlin.math.roundToInt
 
-class Prefs(context: Context) {
+/** [RhSettings]: the seats' thresholds and the lap rules, which the model keeps between runs. */
+class Prefs(context: Context) : RhSettings {
     private val sp = context.getSharedPreferences("widscan58", Context.MODE_PRIVATE)
 
     /** The board is put in this state on every connect. */
@@ -69,6 +77,66 @@ class Prefs(context: Context) {
     var historySmoothed: Boolean
         get() = sp.getBoolean("historyEma", true)
         set(value) = sp.edit().putBoolean("historyEma", value).apply()
+
+    // ---- RotorHazard mode ----
+
+    /** What the model keeps between runs: the seats' thresholds and the lap rules. */
+    override fun load(): RhSaved = RhSaved(
+        enter = IntArray(RH_SEATS) { sp.getInt("rhEnter$it", RH_DEFAULT_ENTER) },
+        exit = IntArray(RH_SEATS) { sp.getInt("rhExit$it", RH_DEFAULT_EXIT) },
+        lapRules = RhLapRules(
+            fastestOn = sp.getBoolean("rhFastestOn", true),
+            count = sp.getInt("rhFastestCount", 3),
+            minLapOn = sp.getBoolean("rhMinLapOn", true),
+            minLapS = sp.getInt("rhMinLapS", 8).toDouble(),
+        ),
+    )
+
+    override fun save(saved: RhSaved) {
+        val e = sp.edit()
+        saved.enter.forEachIndexed { j, v -> e.putInt("rhEnter$j", v) }
+        saved.exit.forEachIndexed { j, v -> e.putInt("rhExit$j", v) }
+        e.putBoolean("rhFastestOn", saved.lapRules.fastestOn)
+        e.putInt("rhFastestCount", saved.lapRules.count)
+        e.putBoolean("rhMinLapOn", saved.lapRules.minLapOn)
+        e.putInt("rhMinLapS", saved.lapRules.minLapS.roundToInt())
+        e.apply()
+    }
+
+    /** The seat the levels chart and the threshold steppers are on. */
+    var rhSeat: Int
+        get() = sp.getInt("rhSeat", 0)
+        set(value) = sp.edit().putInt("rhSeat", value.coerceIn(0, RH_SEATS - 1)).apply()
+
+    var rhSpanSeconds: Int
+        get() = sp.getInt("rhSpan", 30)
+        set(value) = sp.edit().putInt("rhSpan", value).apply()
+
+    var rhShowCrossings: Boolean
+        get() = sp.getBoolean("rhShowCrossings", false)
+        set(value) = sp.edit().putBoolean("rhShowCrossings", value).apply()
+
+    var rhShowFastest: Boolean
+        get() = sp.getBoolean("rhShowFastest", true)
+        set(value) = sp.edit().putBoolean("rhShowFastest", value).apply()
+
+    /** Each lap's channel and time, spoken as the web UI's option does. */
+    var voiceOn: Boolean
+        get() = sp.getBoolean("voiceOn", false)
+        set(value) = sp.edit().putBoolean("voiceOn", value).apply()
+
+    /** The callout, in the web dialog's units: 0-100, and tenths of the normal rate and pitch. */
+    var voiceVolume: Int
+        get() = sp.getInt("voiceVolume", 90)
+        set(value) = sp.edit().putInt("voiceVolume", value.coerceIn(0, 100)).apply()
+
+    var voiceRate: Int
+        get() = sp.getInt("voiceRate", 10)
+        set(value) = sp.edit().putInt("voiceRate", value.coerceIn(1, 20)).apply()
+
+    var voicePitch: Int
+        get() = sp.getInt("voicePitch", 10)
+        set(value) = sp.edit().putInt("voicePitch", value.coerceIn(5, 20)).apply()
 
     private fun put(key: String, value: String) = sp.edit().putString(key, value).apply()
 
