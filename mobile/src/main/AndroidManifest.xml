@@ -50,5 +50,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- The tutorial is a page in assets, opened only from inside the app. -->
+        <activity
+            android:name=".HelpActivity"
+            android:configChanges="screenSize|screenLayout|keyboardHidden|uiMode|density"
+            android:exported="false"
+            android:label="@string/help_title"
+            android:screenOrientation="portrait" />
     </application>
 </manifest>

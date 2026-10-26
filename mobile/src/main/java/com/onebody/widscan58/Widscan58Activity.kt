@@ -3,6 +3,7 @@
 package com.onebody.widscan58
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
@@ -91,6 +92,7 @@ class Widscan58Activity : Activity() {
     private lateinit var avgChip: Button
     private lateinit var moreChip: Button
     private var sheet: SettingsSheet? = null
+    private var general: GeneralSettingsSheet? = null
     private var history: HistorySheet? = null
     private var telemetry: TelemetrySheet? = null
     private var console: ConsoleSheet? = null
@@ -127,6 +129,11 @@ class Widscan58Activity : Activity() {
     private var note = ""
     private var pendingName = ""
     private var showSim = false
+
+    override fun attachBaseContext(newBase: Context) {
+        // Before the first view is built: the language decides which resources every label below reads.
+        super.attachBaseContext(AppLanguage.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -244,6 +251,7 @@ class Widscan58Activity : Activity() {
         // The meter's page ends with the session, and its scan goes back while the wire is still up.
         leavePower()
         sheet?.dismiss()
+        general?.dismiss()
         zoom?.dismiss()
         history?.dismiss()
         telemetry?.dismiss()
@@ -399,6 +407,12 @@ class Widscan58Activity : Activity() {
         sheet?.show(store.status)
     }
 
+    /** The app's own choices, which — unlike the scanner's parameters — are answerable with no board in hand. */
+    private fun openGeneral() {
+        general?.dismiss()
+        general = GeneralSettingsSheet(this, prefs, ::recreate).also { it.show() }
+    }
+
     /** A tile opens that channel's chart, and its stepper moves the rest of the screen with it. */
     private fun openZoom(id: Int) {
         if (store.profile?.channels?.getOrNull(id) == null) return
@@ -417,6 +431,7 @@ class Widscan58Activity : Activity() {
 
     private fun openMore() {
         val menu = PopupMenu(this, moreChip)
+        menu.menu.add(0, MENU_GENERAL, 0, R.string.general_title)
         menu.menu.add(0, MENU_SCALE, 0, R.string.auto_scale)
         menu.menu.add(0, MENU_HISTORY, 0, R.string.history_title)
         menu.menu.add(0, MENU_TELEMETRY, 0, R.string.telemetry_title)
@@ -426,8 +441,10 @@ class Widscan58Activity : Activity() {
         menu.menu.add(0, MENU_RH, 0, R.string.rh_title)
         menu.menu.add(0, MENU_POWER, 0, R.string.power_title)
         menu.menu.add(0, MENU_RAWIQ, 0, R.string.rawiq_title)
+        menu.menu.add(0, MENU_HELP, 0, R.string.help_title)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
+                MENU_GENERAL -> openGeneral()
                 MENU_SCALE -> panorama.autoScale()
                 MENU_HISTORY -> openHistory()
                 MENU_TELEMETRY -> openTelemetry()
@@ -437,6 +454,7 @@ class Widscan58Activity : Activity() {
                 MENU_RH -> openRh()
                 MENU_POWER -> openPower()
                 MENU_RAWIQ -> openRawIq()
+                MENU_HELP -> startActivity(Intent(this, HelpActivity::class.java))
                 else -> return@setOnMenuItemClickListener false
             }
             true
@@ -965,6 +983,10 @@ class Widscan58Activity : Activity() {
         private const val MENU_RH = 7
         private const val MENU_POWER = 8
         private const val MENU_RAWIQ = 9
+
+        /** The menu lists what it adds first, so an id need not sort where the entry sits. */
+        private const val MENU_GENERAL = 10
+        private const val MENU_HELP = 11
 
         /** The meter's spectrum span before a profile has said what it can tune. */
         private const val SPEC_FULL_SPAN_HZ = 40_000_000L
