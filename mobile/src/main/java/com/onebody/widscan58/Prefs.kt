@@ -68,6 +68,13 @@ class Prefs(context: Context) : RhSettings {
         get() = sp.getBoolean("showAvg", true)
         set(value) = sp.edit().putBoolean("showAvg", value).apply()
 
+    // ---- the app itself ----
+
+    /** Which language the app's own words are read in: the tag [AppLanguage] wraps the screen in. */
+    var language: String
+        get() = sp.getString("language", LANGUAGE_ZH)!!
+        set(value) = put("language", value)
+
     /** The history card's window; the store's ring is deep enough for the widest choice. */
     var historySeconds: Int
         get() = sp.getInt("historySeconds", 30)
@@ -158,5 +165,10 @@ class Prefs(context: Context) : RhSettings {
 
         /** The largest attenuator the guide table rates anyone would fit. */
         const val POWER_ATTEN_MAX = 90
+
+        /** The two languages the app ships, and the choice that leaves it to the phone. */
+        const val LANGUAGE_ZH = "zh"
+        const val LANGUAGE_EN = "en"
+        const val LANGUAGE_SYSTEM = "system"
     }
 }

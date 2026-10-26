@@ -133,6 +133,13 @@
 
     <string name="chip_more">⋯</string>
     <string name="more_views">其他视图</string>
+
+    <string name="general_title">常规设置</string>
+    <string name="general_language">语言</string>
+    <string name="lang_zh">中文</string>
+    <string name="lang_en">English</string>
+    <string name="lang_system">跟随系统</string>
+    <string name="help_title">使用帮助</string>
     <string name="auto_scale">自动缩放</string>
     <string name="telemetry_title">扫描器遥测</string>
     <string name="stat_rotation">旋转速率</string>
