@@ -9,3 +9,5 @@ keystore.properties
 *.jks
 *.keystore
 *.p12
+# IDE 编译输出（Kotlin core 模块）
+core/bin/
