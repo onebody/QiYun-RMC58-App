@@ -360,4 +360,22 @@
     <string name="rawiq_constellation">I/Q constellation · ±%1$d counts</string>
     <string name="rawiq_trace">I · Q — transferred counts</string>
     <string name="rawiq_spectrum">dBFS per bin · %1$s MHz span</string>
+
+    <!-- Wireless relay: the phone is the uplink the relay node dials -->
+    <string name="relay_title">Wireless relay</string>
+    <string name="relay_start">Start listening</string>
+    <string name="relay_stop">Stop listening</string>
+    <string name="relay_status_on">Listening · port %1$d</string>
+    <string name="relay_status_off">Stopped · port %1$d</string>
+    <string name="relay_no_address">No Wi-Fi address: join a network or turn on the hotspot first</string>
+    <string name="relay_address">Phone addresses: %1$s</string>
+    <string name="relay_waiting">Waiting for a relay…</string>
+    <string name="relay_peer_now">Attached: %1$s</string>
+    <string name="relay_usb_active">USB is connected, so a relay would be refused</string>
+    <string name="relay_busy">A relay arrived, but USB owns the wire</string>
+    <string name="relay_stopped">Relay listening stopped</string>
+    <string name="relay_bind_failed">Cannot listen on port %1$d: %2$s</string>
+    <string name="relay_link_prefix">relay</string>
+    <string name="note_relay_gone">relay gone: %1$s</string>
+    <string name="relay_hint">In the relay setup page set the server to %1$s:%2$d (ws://%1$s:%2$d/node). Phone and relay must share a network; one relay at a time.</string>
 </resources>

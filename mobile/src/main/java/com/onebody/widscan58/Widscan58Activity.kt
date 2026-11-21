@@ -44,6 +44,8 @@ import com.onebody.widscan58.core.channelsCsv
 import com.onebody.widscan58.core.readSession
 import com.onebody.widscan58.core.restoreCommands
 import com.onebody.widscan58.core.spectrumCsv
+import com.onebody.widscan58.relay.RelayLink
+import com.onebody.widscan58.relay.RelayServer
 import com.onebody.widscan58.usb.CdcLayout
 import com.onebody.widscan58.usb.UsbAccess
 import com.onebody.widscan58.usb.UsbSerialLink
@@ -117,7 +119,11 @@ class Widscan58Activity : Activity() {
     private val linkRate = LinkRate()
     private val dropWindow = DropWindow()
 
-    private var link: UsbSerialLink? = null
+    private var link: BoardLink? = null
+    /** The listener the phone serves to a wireless relay, and the relay currently on it. */
+    private var relay: RelayServer? = null
+    private var relayLink: RelayLink? = null
+    private var relaySheet: RelaySheet? = null
     private var sim: SimFeed? = null
     private var runner: CommandRunner? = null
     private var parser: StreamParser? = null
@@ -236,6 +242,7 @@ class Widscan58Activity : Activity() {
         feed.resume()
         if (showSim) sim?.start()
         rh?.resume()
+        if (prefs.relayListen) startRelay()
         if (link == null) findBoard(usbManager())?.let(::requestAndOpen)
     }
 
@@ -260,11 +267,14 @@ class Widscan58Activity : Activity() {
         session?.dismiss()
         rawiq?.dismiss()
         rhSheet?.dismiss()
+        relaySheet?.dismiss()
         main.removeCallbacks(drawLoop)
         main.removeCallbacks(watchdog)
         feed.pause()
         sim?.stop()
         closeLink(getString(R.string.note_paused))
+        // The relay redials when the screen comes back, so the listener need not outlive it.
+        stopRelay()
         // A board's session went with that port; the simulator keeps its link, so its cycle has to be
         // stopped here or it polls, and calls laps, from the background.
         rh?.pause()
@@ -275,6 +285,8 @@ class Widscan58Activity : Activity() {
         endRh()
         rhVoice?.release()
         rhVoice = null
+        relaySheet?.dismiss()
+        stopRelay()
     }
 
     // ---- drawing: one coalesced refresh per frame, only when the data changed ----
@@ -335,6 +347,7 @@ class Widscan58Activity : Activity() {
         rhSheet?.update()
         power?.update()
         rawiq?.update()
+        relaySheet?.update()
         statusLine.text = status()
     }
 
@@ -441,6 +454,7 @@ class Widscan58Activity : Activity() {
         menu.menu.add(0, MENU_RH, 0, R.string.rh_title)
         menu.menu.add(0, MENU_POWER, 0, R.string.power_title)
         menu.menu.add(0, MENU_RAWIQ, 0, R.string.rawiq_title)
+        menu.menu.add(0, MENU_RELAY, 0, R.string.relay_title)
         menu.menu.add(0, MENU_HELP, 0, R.string.help_title)
         menu.menu.add(0, MENU_ABOUT, 0, R.string.about_title)
         menu.setOnMenuItemClickListener { item ->
@@ -455,6 +469,7 @@ class Widscan58Activity : Activity() {
                 MENU_RH -> openRh()
                 MENU_POWER -> openPower()
                 MENU_RAWIQ -> openRawIq()
+                MENU_RELAY -> openRelay()
                 MENU_HELP -> startActivity(Intent(this, HelpActivity::class.java))
                 MENU_ABOUT -> startActivity(Intent(this, AboutActivity::class.java))
                 else -> return@setOnMenuItemClickListener false
@@ -895,6 +910,7 @@ class Widscan58Activity : Activity() {
     private fun closeLink(why: String) {
         val l = link ?: return
         link = null
+        if (relayLink === l) relayLink = null
         // The session writes to this port, so it goes before the port does.
         endRh()
         // The link is gone, so this only closes the page; there is no board left to hand a scan back.
@@ -909,6 +925,91 @@ class Widscan58Activity : Activity() {
         store.addLog(LogDir.INFO, "connection closed: $why")
     }
 
+    // ---- the wireless relay: the phone serves the uplink the ESP32-S3 dials ----
+
+    private fun openRelay() {
+        relaySheet?.dismiss()
+        // Enumerated once: the page refreshes every frame, the network does not.
+        val addresses = RelayServer.addresses()
+        relaySheet = RelaySheet(
+            this,
+            state = {
+                RelaySheet.State(
+                    listening = relay?.listening == true,
+                    port = prefs.relayPort,
+                    addresses = addresses,
+                    peer = relay?.peerId,
+                    usb = link != null && link !is RelayLink,
+                )
+            },
+            onStart = { port ->
+                prefs.relayPort = port
+                val err = startRelay()
+                if (err == null) {
+                    prefs.relayListen = true
+                } else {
+                    note = getString(R.string.relay_bind_failed, port, err)
+                    refresh()
+                }
+                relaySheet?.update()
+            },
+            onStop = {
+                stopRelay()
+                prefs.relayListen = false
+                refresh()
+                relaySheet?.update()
+            },
+        ).also { it.show() }
+    }
+
+    /** Returns null when listening, or why the port could not be bound. */
+    private fun startRelay(): String? {
+        if (relay != null) return null
+        val server = RelayServer(prefs.relayPort)
+        server.onLog = { message -> store.addLog(LogDir.INFO, message) }
+        server.onPeer = { peer -> main.post { attachRelay(peer) } }
+        val err = server.start()
+        if (err != null) return err
+        relay = server
+        store.addLog(LogDir.INFO, "relay listening on ${prefs.relayPort}")
+        refresh()
+        return null
+    }
+
+    private fun stopRelay() {
+        val server = relay ?: return
+        relay = null
+        if (link is RelayLink) closeLink(getString(R.string.relay_stopped))
+        relayLink = null
+        server.stop()
+    }
+
+    /** A relay finished its handshake; it feeds the same parser and runner the USB port does. */
+    private fun attachRelay(peer: RelayServer.Peer) {
+        if (link != null || sim != null || feed.started) {
+            peer.close("app busy")
+            note = getString(R.string.relay_busy)
+            refresh()
+            return
+        }
+        val opened = RelayLink(peer, getString(R.string.relay_link_prefix))
+        relayLink = opened
+        link = opened
+        parser = StreamParser()
+        runner = CommandRunner(write = { opened.write(it) }, scheduler = scheduler)
+        opened.onBytes = ::feedBytes
+        peer.onBytes = { chunk -> opened.onBytes?.invoke(chunk) }
+        peer.onClose = { why ->
+            main.post { if (relayLink === opened) closeLink(getString(R.string.note_relay_gone, why)) }
+        }
+        lastFrameMs = SystemClock.elapsedRealtime()
+        note = ""
+        store.addLog(LogDir.INFO, "connected via relay ${peer.id}")
+        // The firmware boots silent in RotorHazard mode; ask for our stream first.
+        command("PROTOCOL MONITOR") { handshake() }
+        refresh()
+    }
+
     private fun command(line: String, reply: (CommandResult) -> Unit = {}) {
         if (feed.started) {
             note = getString(R.string.note_replay_readonly)
@@ -920,17 +1021,19 @@ class Widscan58Activity : Activity() {
             store.addLog(LogDir.ERROR, "RotorHazard mode: $line")
             return
         }
-        store.addLog(LogDir.TX, line)
+        // The relay answers INFO and REBOOT itself; HEAD aims the line at the C5 behind it.
+        val sent = if (link is RelayLink && line == DeviceCommands.REBOOT) "HEAD $line" else line
+        store.addLog(LogDir.TX, sent)
         sim?.let {
             it.onCommand(line)
             return
         }
         val r = runner ?: run {
-            store.addLog(LogDir.ERROR, "not connected: $line")
-            note = getString(R.string.note_not_connected, line)
+            store.addLog(LogDir.ERROR, "not connected: $sent")
+            note = getString(R.string.note_not_connected, sent)
             return
         }
-        r.send(line) { result ->
+        r.send(sent) { result ->
             if (result is CommandResult.Failed) note = result.why
             reply(result)
         }
@@ -990,6 +1093,7 @@ class Widscan58Activity : Activity() {
         private const val MENU_GENERAL = 10
         private const val MENU_HELP = 11
         private const val MENU_ABOUT = 12
+        private const val MENU_RELAY = 13
 
         /** The meter's spectrum span before a profile has said what it can tune. */
         private const val SPEC_FULL_SPAN_HZ = 40_000_000L

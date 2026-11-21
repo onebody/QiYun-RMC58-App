@@ -12,6 +12,7 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
+import com.onebody.widscan58.BoardLink
 
 private const val SET_CONTROL_LINE_STATE = 0x22
 
@@ -31,14 +32,14 @@ class UsbSerialLink private constructor(
     private val device: UsbDevice,
     private val connection: UsbDeviceConnection,
     private val layout: CdcLayout,
-) {
-    var onBytes: ((ByteArray) -> Unit)? = null
-    var onClose: ((String) -> Unit)? = null
+) : BoardLink {
+    override var onBytes: ((ByteArray) -> Unit)? = null
+    override var onClose: ((String) -> Unit)? = null
 
     @Volatile private var active = false
     private var reader: Thread? = null
 
-    val description: String get() = "${device.deviceName} · ${layout.describe()}"
+    override val description: String get() = "${device.deviceName} · ${layout.describe()}"
 
     private fun start() {
         active = true
@@ -76,10 +77,10 @@ class UsbSerialLink private constructor(
     private fun stillPresent() = manager.deviceList[device.deviceName] != null
 
     /** Commands are a few dozen bytes; the CDC write path takes them in one shot. */
-    fun write(data: ByteArray): Boolean =
+    override fun write(data: ByteArray): Boolean =
         connection.bulkTransfer(layout.outEndpoint, data, data.size, WRITE_TIMEOUT_MS) >= 0
 
-    fun close() {
+    override fun close() {
         active = false
         reader?.interrupt()
         reader = null

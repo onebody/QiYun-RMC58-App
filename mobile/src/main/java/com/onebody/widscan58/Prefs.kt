@@ -14,6 +14,7 @@ import com.onebody.widscan58.core.RH_SEATS
 import com.onebody.widscan58.core.RhLapRules
 import com.onebody.widscan58.core.RhSaved
 import com.onebody.widscan58.core.RhSettings
+import com.onebody.widscan58.relay.RelayServer
 import kotlin.math.roundToInt
 
 /** [RhSettings]: the seats' thresholds and the lap rules, which the model keeps between runs. */
@@ -84,6 +85,18 @@ class Prefs(context: Context) : RhSettings {
     var historySmoothed: Boolean
         get() = sp.getBoolean("historyEma", true)
         set(value) = sp.edit().putBoolean("historyEma", value).apply()
+
+    // ---- the wireless relay ----
+
+    /** The port the phone serves the relay uplink on; the relay dials ws://<phone>:<port>/node. */
+    var relayPort: Int
+        get() = sp.getInt("relayPort", RelayServer.DEFAULT_PORT).coerceIn(1024, 65535)
+        set(value) = sp.edit().putInt("relayPort", value.coerceIn(1024, 65535)).apply()
+
+    /** Whether the listener should come back with the screen. */
+    var relayListen: Boolean
+        get() = sp.getBoolean("relayListen", false)
+        set(value) = sp.edit().putBoolean("relayListen", value).apply()
 
     // ---- RotorHazard mode ----
 

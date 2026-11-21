@@ -362,4 +362,22 @@
     <string name="rawiq_constellation">I/Q 星座图 · ±%1$d 计数</string>
     <string name="rawiq_trace">I · Q — 传输计数</string>
     <string name="rawiq_spectrum">每 bin dBFS · 跨度 %1$s MHz</string>
+
+    <!-- 无线中继：手机作为中继节点的接入端 -->
+    <string name="relay_title">无线中继</string>
+    <string name="relay_start">启动监听</string>
+    <string name="relay_stop">停止监听</string>
+    <string name="relay_status_on">正在监听 · 端口 %1$d</string>
+    <string name="relay_status_off">未启动 · 端口 %1$d</string>
+    <string name="relay_no_address">没有 Wi-Fi 地址：先连接路由器或打开手机热点</string>
+    <string name="relay_address">本机地址：%1$s</string>
+    <string name="relay_waiting">等待中继连接…</string>
+    <string name="relay_peer_now">已接入：%1$s</string>
+    <string name="relay_usb_active">USB 已连接，中继会被拒绝</string>
+    <string name="relay_busy">中继已连接，但 USB 正在使用</string>
+    <string name="relay_stopped">中继监听已停止</string>
+    <string name="relay_bind_failed">无法监听端口 %1$d：%2$s</string>
+    <string name="relay_link_prefix">无线中继</string>
+    <string name="note_relay_gone">中继断开：%1$s</string>
+    <string name="relay_hint">在中继节点配置页把服务器设为 %1$s:%2$d（ws://%1$s:%2$d/node）。手机与中继需在同一网络，一次只接入一个中继。</string>
 </resources>

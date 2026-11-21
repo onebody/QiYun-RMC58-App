@@ -156,15 +156,21 @@ class Store(
                 addLog(if (item.line.startsWith("ERR")) LogDir.ERROR else LogDir.RX, item.line)
             }
 
-            is StreamItem.Frame -> when (item.type) {
-                FrameType.METRICS -> onMetrics(parseMetrics(item.payload))
-                FrameType.LEVELS -> onMetrics(parseLevels(item.payload))
-                FrameType.SPECTRUM -> onSpectrum(parseSpectrum(item.payload))
-                FrameType.TELEMETRY -> telemetry = parseTelemetry(item.payload)
-                FrameType.RAWIQ -> rawiqChunks.add(item.payload)?.let { rawiq = it }
-                // The firmware has never used this type, but the web prints it, so we do too.
-                FrameType.LOG -> addLog(LogDir.INFO, String(item.payload, Charsets.UTF_8).trim('\u0000', '\n', '\r'))
-                else -> Unit
+            // A relay peer is network input: a frame that passes CRC can still be too
+            // short for its own header, and that must not take the UI down.
+            is StreamItem.Frame -> try {
+                when (item.type) {
+                    FrameType.METRICS -> onMetrics(parseMetrics(item.payload))
+                    FrameType.LEVELS -> onMetrics(parseLevels(item.payload))
+                    FrameType.SPECTRUM -> onSpectrum(parseSpectrum(item.payload))
+                    FrameType.TELEMETRY -> telemetry = parseTelemetry(item.payload)
+                    FrameType.RAWIQ -> rawiqChunks.add(item.payload)?.let { rawiq = it }
+                    // The firmware has never used this type, but the web prints it, so we do too.
+                    FrameType.LOG -> addLog(LogDir.INFO, String(item.payload, Charsets.UTF_8).trim('\u0000', '\n', '\r'))
+                    else -> Unit
+                }
+            } catch (e: RuntimeException) {
+                addLog(LogDir.ERROR, "bad frame type ${item.type}: ${e.message}")
             }
         }
         version++
